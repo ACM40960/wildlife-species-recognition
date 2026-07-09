@@ -1,0 +1,26 @@
+{
+  "data_dir": "data/synthetic",
+  "image_size": 128,
+  "val_fraction": 0.15,
+  "test_fraction": 0.15,
+  "grayscale_to_rgb": true,
+  "num_workers": 2,
+  "backbone": "resnet18",
+  "pretrained": false,
+  "freeze_until": "",
+  "epochs": 8,
+  "batch_size": 32,
+  "learning_rate": 0.001,
+  "weight_decay": 0.0001,
+  "label_smoothing": 0.05,
+  "early_stop_patience": 5,
+  "seed": 42,
+  "device": "cpu",
+  "output_dir": "results/demo",
+  "checkpoint_name": "best_model.pt",
+  "experiment_name": "ntlnp_resnet18",
+  "baselines": {
+    "Norouzzadeh 2018 (Serengeti, expert-level)": 0.935,
+    "Schneider 2020 (out-of-location, worst case)": 0.7
+  }
+}

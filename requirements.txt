@@ -1,0 +1,25 @@
+# Core ML stack
+torch>=2.0
+torchvision>=0.15
+
+# Data / numerics
+numpy>=1.24
+Pillow>=9.0
+
+# Metrics, splitting, evaluation
+scikit-learn>=1.2
+
+# Plotting (confusion matrices, training curves)
+matplotlib>=3.6
+
+# Progress bars
+tqdm>=4.64
+
+# YOLOv8 object detection (optional, used by the detection cropping step).
+# Install separately if you want the detection stage:
+#   pip install ultralytics
+# ultralytics>=8.0
+
+# OpenCV for image preprocessing (optional)
+#   pip install opencv-python-headless
+# opencv-python-headless>=4.7

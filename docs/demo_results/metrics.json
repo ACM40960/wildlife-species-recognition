@@ -1,0 +1,67 @@
+{
+  "test_accuracy": 0.92,
+  "precision_macro": 0.9428571428571428,
+  "recall_macro": 0.9199999999999999,
+  "f1_macro": 0.9166666666666667,
+  "precision_weighted": 0.942857142857143,
+  "recall_weighted": 0.92,
+  "f1_weighted": 0.9166666666666666,
+  "n_test": 75,
+  "n_classes": 5,
+  "class_names": [
+    "amur_leopard",
+    "amur_tiger",
+    "red_fox",
+    "roe_deer",
+    "wild_boar"
+  ],
+  "per_class": {
+    "amur_leopard": {
+      "precision": 0.7142857142857143,
+      "recall": 1.0,
+      "f1-score": 0.8333333333333334,
+      "support": 15.0
+    },
+    "amur_tiger": {
+      "precision": 1.0,
+      "recall": 0.6,
+      "f1-score": 0.75,
+      "support": 15.0
+    },
+    "red_fox": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 15.0
+    },
+    "roe_deer": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 15.0
+    },
+    "wild_boar": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 15.0
+    },
+    "accuracy": 0.92,
+    "macro avg": {
+      "precision": 0.9428571428571428,
+      "recall": 0.9199999999999999,
+      "f1-score": 0.9166666666666667,
+      "support": 75.0
+    },
+    "weighted avg": {
+      "precision": 0.942857142857143,
+      "recall": 0.92,
+      "f1-score": 0.9166666666666666,
+      "support": 75.0
+    }
+  },
+  "baselines": {
+    "Norouzzadeh 2018 (Serengeti, expert-level)": 0.935,
+    "Schneider 2020 (out-of-location, worst case)": 0.7
+  }
+}
