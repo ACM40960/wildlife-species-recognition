@@ -22,43 +22,69 @@ from typing import List
 import numpy as np
 from PIL import Image, ImageDraw
 
-# Stand-in species names; the real dataset defines its own class folders.
-DEFAULT_SPECIES = ["amur_leopard", "amur_tiger", "red_fox", "wild_boar", "roe_deer"]
+# The real 17 NTLNP classes (Northeast Tiger & Leopard National Park).
+# Using the real taxonomy so the demo dataset mirrors the actual folder layout.
+DEFAULT_SPECIES = [
+    "amur_tiger", "amur_leopard", "wild_boar", "roe_deer", "sika_deer",
+    "asian_black_bear", "red_fox", "asian_badger", "raccoon_dog", "musk_deer",
+    "siberian_weasel", "sable", "yellow_throated_marten", "leopard_cat",
+    "manchurian_hare", "cow", "dog",
+]
+
+
+def _class_attributes(species_idx: int) -> dict:
+    """Deterministic, per-class silhouette attributes.
+
+    Each class gets a distinct combination of body shape, aspect ratio,
+    brightness band, and appendages (ears / tail / legs) so that all 17 classes
+    are visually separable — otherwise a classifier could not learn them apart.
+    Variation *within* a class is added later from the RNG.
+    """
+    body_shapes = ["ellipse", "rounded_rect", "rect"]
+    return {
+        "body": body_shapes[species_idx % 3],
+        "aspect": 1.1 + 0.22 * (species_idx % 5),      # length/height ratio
+        "bright": 140 + 9 * (species_idx % 10),        # base IR brightness band
+        "ears": (species_idx % 2 == 0),                # pointy ears
+        "tail": (species_idx % 3 == 0),                # long tail
+        "legs": [0, 2, 4][species_idx % 3],            # number of visible legs
+        "size": 0.16 + 0.015 * (species_idx % 6),      # relative body size
+    }
 
 
 def _draw_silhouette(draw: ImageDraw.ImageDraw, species_idx: int, size: int,
                      rng: np.random.Generator) -> None:
-    """Draw a rough, species-specific bright shape on a dark background."""
-    cx = rng.integers(size // 3, 2 * size // 3)
-    cy = rng.integers(size // 3, 2 * size // 3)
-    scale = rng.uniform(0.18, 0.30) * size
-    fill = int(rng.integers(150, 230))  # animals read brighter than background in IR
+    """Draw a rough, class-distinct bright shape on a dark background."""
+    attr = _class_attributes(species_idx)
+    cx = rng.integers(int(size * 0.38), int(size * 0.62))
+    cy = rng.integers(int(size * 0.40), int(size * 0.60))
+    scale = (attr["size"] + rng.uniform(-0.02, 0.02)) * size
+    fill = int(np.clip(attr["bright"] + rng.integers(-15, 15), 90, 235))
+    aspect = attr["aspect"]
 
-    shape = species_idx % 5
-    if shape == 0:  # elongated body (big cat)
-        draw.ellipse([cx - scale * 1.6, cy - scale * 0.6,
-                      cx + scale * 1.6, cy + scale * 0.6], fill=fill)
-    elif shape == 1:  # body + prominent tail (tiger-ish)
-        draw.ellipse([cx - scale * 1.4, cy - scale * 0.7,
-                      cx + scale * 1.4, cy + scale * 0.7], fill=fill)
-        draw.line([cx + scale * 1.4, cy, cx + scale * 2.4, cy - scale],
-                  fill=fill, width=max(2, int(scale * 0.25)))
-    elif shape == 2:  # compact + pointy ears (fox)
-        draw.ellipse([cx - scale, cy - scale, cx + scale, cy + scale], fill=fill)
-        draw.polygon([(cx - scale, cy - scale), (cx - scale * 0.5, cy - scale * 1.8),
-                      (cx, cy - scale)], fill=fill)
-        draw.polygon([(cx, cy - scale), (cx + scale * 0.5, cy - scale * 1.8),
-                      (cx + scale, cy - scale)], fill=fill)
-    elif shape == 3:  # bulky low body (boar)
-        draw.rectangle([cx - scale * 1.3, cy - scale * 0.5,
-                        cx + scale * 1.3, cy + scale * 0.8], fill=fill)
-    else:  # tall body + legs (deer)
-        draw.ellipse([cx - scale, cy - scale * 0.6, cx + scale, cy + scale * 0.4],
-                     fill=fill)
-        for dx in (-0.7, -0.3, 0.3, 0.7):
-            draw.line([cx + scale * dx, cy + scale * 0.4,
-                       cx + scale * dx, cy + scale * 1.4],
-                      fill=fill, width=max(2, int(scale * 0.15)))
+    hw, hh = scale * aspect, scale  # half-width, half-height
+    box = [cx - hw, cy - hh, cx + hw, cy + hh]
+    if attr["body"] == "ellipse":
+        draw.ellipse(box, fill=fill)
+    elif attr["body"] == "rounded_rect":
+        draw.rounded_rectangle(box, radius=int(scale * 0.5), fill=fill)
+    else:
+        draw.rectangle(box, fill=fill)
+
+    if attr["tail"]:
+        draw.line([cx + hw, cy, cx + hw + scale * 1.1, cy - scale * 0.9],
+                  fill=fill, width=max(2, int(scale * 0.22)))
+    if attr["ears"]:
+        draw.polygon([(cx - hw * 0.7, cy - hh), (cx - hw * 0.4, cy - hh - scale * 0.9),
+                      (cx - hw * 0.1, cy - hh)], fill=fill)
+        draw.polygon([(cx + hw * 0.1, cy - hh), (cx + hw * 0.4, cy - hh - scale * 0.9),
+                      (cx + hw * 0.7, cy - hh)], fill=fill)
+    if attr["legs"]:
+        step = (2 * hw) / (attr["legs"] + 1)
+        for i in range(1, attr["legs"] + 1):
+            lx = cx - hw + step * i
+            draw.line([lx, cy + hh, lx, cy + hh + scale * 0.9],
+                      fill=fill, width=max(2, int(scale * 0.13)))
 
 
 def _make_image(species_idx: int, size: int, rng: np.random.Generator) -> Image.Image:

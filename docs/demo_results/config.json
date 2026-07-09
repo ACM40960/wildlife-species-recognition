@@ -1,5 +1,5 @@
 {
-  "data_dir": "data/synthetic",
+  "data_dir": "data/demo_ntlnp",
   "image_size": 128,
   "val_fraction": 0.15,
   "test_fraction": 0.15,
@@ -8,7 +8,7 @@
   "backbone": "resnet18",
   "pretrained": false,
   "freeze_until": "",
-  "epochs": 8,
+  "epochs": 12,
   "batch_size": 32,
   "learning_rate": 0.001,
   "weight_decay": 0.0001,

@@ -6,9 +6,13 @@ __pycache__/
 venv/
 env/
 
-# Datasets (never commit the raw NTLNP data — it is large)
-data/
+# Datasets: never commit the large raw NTLNP data, but DO commit the small
+# ready-to-run demo dataset so the repo works straight after `git clone`.
+data/*
 !data/.gitkeep
+!data/demo_ntlnp/
+data/ntlnp/
+data/ntlnp_raw/
 
 # Training artifacts
 *.pt

@@ -43,58 +43,80 @@ pip install -r requirements.txt          # torch, torchvision, numpy, scikit-lea
 pip install ultralytics opencv-python-headless
 ```
 
-## Quick start (runs anywhere, no dataset download needed)
+## Test it in one command (no download, no setup beyond `pip install`)
 
-The full pipeline can be exercised on a synthetic night-vision dataset. This is a
-**smoke test / demo**, not a scientific result — the images are fabricated
-silhouettes designed only to make every code path runnable and every plot
-reproducible on a plain CPU.
+The repo ships a small **ready-to-run dataset** at
+[`data/demo_ntlnp/`](data/demo_ntlnp) — 17 folders named for the **real NTLNP
+species** (amur_tiger, amur_leopard, red_fox, …), each with 60 synthetic
+night-vision frames. This lets the *entire* pipeline run straight after
+`git clone`, on a plain CPU, in a few minutes.
+
+> These demo images are **fabricated IR silhouettes**, one distinct shape per
+> species — a smoke test that exercises every code path and reproduces every
+> plot. They are **not** the real NTLNP photos and the numbers below are **not**
+> a scientific result. To run on the real data, see the next section.
 
 ```bash
-# 1. Make a small synthetic dataset (5 fake species, ImageFolder layout)
-python scripts/make_synthetic_data.py --out data/synthetic --per-class 100 --image-size 128
+pip install -r requirements.txt
 
-# 2. Train (from scratch here; use --pretrained on a machine with internet)
-python scripts/run_training.py --data-dir data/synthetic --epochs 8 --image-size 128 \
+# Train (from scratch; the sandbox blocks the ImageNet-weights download — see note)
+python scripts/run_training.py --data-dir data/demo_ntlnp --epochs 12 --image-size 128 \
     --no-pretrained --freeze-until "" --output-dir results/demo --device cpu
 
-# 3. Evaluate on the held-out test split
+# Evaluate on the held-out test split
 python scripts/run_evaluation.py --output-dir results/demo --device cpu
 
-# 4. Classify one image
-python scripts/predict.py data/synthetic/red_fox/red_fox_0000.jpg \
+# Classify one image
+python scripts/predict.py data/demo_ntlnp/red_fox/red_fox_0000.jpg \
     --checkpoint results/demo/best_model.pt
 ```
 
-Outputs (checkpoint, `metrics.json`, training curves, confusion matrix, baseline
-bar chart) land in `results/demo/`. A committed copy of the plots from one such
-run is in [`docs/demo_results/`](docs/demo_results/).
+On the committed demo data this reaches **~0.86 test accuracy across all 17
+classes** (macro precision ~0.90 / recall ~0.86). Outputs — checkpoint,
+`metrics.json`, training curves, confusion matrix, and the baseline bar chart —
+land in `results/demo/`; a committed snapshot of the plots is in
+[`docs/demo_results/`](docs/demo_results/).
+
+You can regenerate the demo dataset with different size/seed:
+
+```bash
+python scripts/make_synthetic_data.py --out data/demo_ntlnp --per-class 60 --image-size 128
+```
 
 ## Running on the real NTLNP dataset
 
-1. Download NTLNP from https://github.com/myyyyw/NTLNP.
-2. Arrange it as one folder per species (ImageFolder layout):
+The real dataset is **25,657 infrared camera-trap images across 17 species**,
+hosted on Hugging Face. A downloader is included:
 
-   ```
-   data/ntlnp/
-     amur_leopard/  img001.jpg ...
-     amur_tiger/    ...
-     red_fox/       ...
-   ```
-3. Train with ImageNet-pretrained transfer learning (retraining the last block):
+```bash
+bash scripts/download_ntlnp.sh          # needs git-lfs; clones from Hugging Face
+```
 
-   ```bash
-   python scripts/run_training.py --data-dir data/ntlnp --backbone resnet18 \
-       --pretrained --freeze-until layer4 --epochs 15 --output-dir results/ntlnp
-   python scripts/run_evaluation.py --output-dir results/ntlnp
-   ```
+Then arrange the frames as one folder per species (ImageFolder layout):
 
-   > **Note on this sandbox:** downloading ImageNet weights requires network
-   > access to `download.pytorch.org`, which is blocked by the egress policy of
-   > the environment this repo was built in. That is why the demo above uses
-   > `--no-pretrained`. On any normal machine, drop `--no-pretrained` (or pass
-   > `--pretrained`) to get the transfer-learning setup the project is really
-   > about, which is what drives the accuracies reported in the literature.
+```
+data/ntlnp/
+  amur_tiger/    img001.jpg ...
+  amur_leopard/  ...
+  red_fox/       ...
+```
+
+and train with ImageNet-pretrained transfer learning (retraining the last block):
+
+```bash
+python scripts/run_training.py --data-dir data/ntlnp --backbone resnet18 \
+    --pretrained --freeze-until layer4 --epochs 15 --output-dir results/ntlnp
+python scripts/run_evaluation.py --output-dir results/ntlnp
+```
+
+> **Why the real data isn't committed here.** This repo was built inside a
+> sandbox whose egress policy **blocks `huggingface.co` and
+> `download.pytorch.org`** (verified: both return HTTP 403). So neither the real
+> dataset nor the ImageNet weights could be fetched from the build environment —
+> that is why the committed demo uses a synthetic dataset and `--no-pretrained`.
+> On any normal machine `scripts/download_ntlnp.sh` fetches the real data, and
+> dropping `--no-pretrained` gives the transfer-learning setup the project is
+> really about, which drives the accuracies reported in the literature.
 
 ### Optional: detect-and-crop with YOLOv8
 
