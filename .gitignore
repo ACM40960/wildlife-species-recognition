@@ -7,12 +7,13 @@ venv/
 env/
 
 # Datasets: never commit the large raw NTLNP data, but DO commit the small
-# ready-to-run demo dataset so the repo works straight after `git clone`.
+# ready-to-run real-image dataset so the repo works straight after `git clone`.
 data/*
 !data/.gitkeep
-!data/demo_ntlnp/
+!data/real_animals/
 data/ntlnp/
 data/ntlnp_raw/
+CIFAR-10-images/
 
 # Training artifacts
 *.pt

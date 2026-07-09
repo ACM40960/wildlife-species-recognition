@@ -1,147 +1,70 @@
 {
-  "test_accuracy": 0.8627450980392157,
-  "precision_macro": 0.8993868588159245,
-  "recall_macro": 0.8627450980392157,
-  "f1_macro": 0.8558789218984164,
-  "precision_weighted": 0.8993868588159247,
-  "recall_weighted": 0.8627450980392157,
-  "f1_weighted": 0.8558789218984163,
-  "n_test": 153,
-  "n_classes": 17,
+  "test_accuracy": 0.7466666666666667,
+  "precision_macro": 0.7537117131498959,
+  "recall_macro": 0.7466666666666667,
+  "f1_macro": 0.7481135862395233,
+  "precision_weighted": 0.7537117131498958,
+  "recall_weighted": 0.7466666666666667,
+  "f1_weighted": 0.7481135862395233,
+  "n_test": 450,
+  "n_classes": 6,
   "class_names": [
-    "amur_leopard",
-    "amur_tiger",
-    "asian_badger",
-    "asian_black_bear",
-    "cow",
+    "bird",
+    "cat",
+    "deer",
     "dog",
-    "leopard_cat",
-    "manchurian_hare",
-    "musk_deer",
-    "raccoon_dog",
-    "red_fox",
-    "roe_deer",
-    "sable",
-    "siberian_weasel",
-    "sika_deer",
-    "wild_boar",
-    "yellow_throated_marten"
+    "frog",
+    "horse"
   ],
   "per_class": {
-    "amur_leopard": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 9.0
+    "bird": {
+      "precision": 0.8095238095238095,
+      "recall": 0.68,
+      "f1-score": 0.7391304347826086,
+      "support": 75.0
     },
-    "amur_tiger": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 9.0
+    "cat": {
+      "precision": 0.5888888888888889,
+      "recall": 0.7066666666666667,
+      "f1-score": 0.6424242424242425,
+      "support": 75.0
     },
-    "asian_badger": {
-      "precision": 0.6428571428571429,
-      "recall": 1.0,
-      "f1-score": 0.782608695652174,
-      "support": 9.0
-    },
-    "asian_black_bear": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 9.0
-    },
-    "cow": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 9.0
+    "deer": {
+      "precision": 0.7341772151898734,
+      "recall": 0.7733333333333333,
+      "f1-score": 0.7532467532467533,
+      "support": 75.0
     },
     "dog": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 9.0
+      "precision": 0.7,
+      "recall": 0.6533333333333333,
+      "f1-score": 0.6758620689655173,
+      "support": 75.0
     },
-    "leopard_cat": {
-      "precision": 1.0,
-      "recall": 0.4444444444444444,
-      "f1-score": 0.6153846153846154,
-      "support": 9.0
+    "frog": {
+      "precision": 0.863013698630137,
+      "recall": 0.84,
+      "f1-score": 0.8513513513513513,
+      "support": 75.0
     },
-    "manchurian_hare": {
-      "precision": 0.75,
-      "recall": 0.3333333333333333,
-      "f1-score": 0.46153846153846156,
-      "support": 9.0
+    "horse": {
+      "precision": 0.8266666666666667,
+      "recall": 0.8266666666666667,
+      "f1-score": 0.8266666666666667,
+      "support": 75.0
     },
-    "musk_deer": {
-      "precision": 0.6923076923076923,
-      "recall": 1.0,
-      "f1-score": 0.8181818181818182,
-      "support": 9.0
-    },
-    "raccoon_dog": {
-      "precision": 0.5294117647058824,
-      "recall": 1.0,
-      "f1-score": 0.6923076923076923,
-      "support": 9.0
-    },
-    "red_fox": {
-      "precision": 0.8,
-      "recall": 0.8888888888888888,
-      "f1-score": 0.8421052631578947,
-      "support": 9.0
-    },
-    "roe_deer": {
-      "precision": 1.0,
-      "recall": 0.5555555555555556,
-      "f1-score": 0.7142857142857143,
-      "support": 9.0
-    },
-    "sable": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 9.0
-    },
-    "siberian_weasel": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 9.0
-    },
-    "sika_deer": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 9.0
-    },
-    "wild_boar": {
-      "precision": 1.0,
-      "recall": 0.6666666666666666,
-      "f1-score": 0.8,
-      "support": 9.0
-    },
-    "yellow_throated_marten": {
-      "precision": 0.875,
-      "recall": 0.7777777777777778,
-      "f1-score": 0.8235294117647058,
-      "support": 9.0
-    },
-    "accuracy": 0.8627450980392157,
+    "accuracy": 0.7466666666666667,
     "macro avg": {
-      "precision": 0.8993868588159245,
-      "recall": 0.8627450980392157,
-      "f1-score": 0.8558789218984164,
-      "support": 153.0
+      "precision": 0.7537117131498959,
+      "recall": 0.7466666666666667,
+      "f1-score": 0.7481135862395233,
+      "support": 450.0
     },
     "weighted avg": {
-      "precision": 0.8993868588159247,
-      "recall": 0.8627450980392157,
-      "f1-score": 0.8558789218984163,
-      "support": 153.0
+      "precision": 0.7537117131498958,
+      "recall": 0.7466666666666667,
+      "f1-score": 0.7481135862395233,
+      "support": 450.0
     }
   },
   "baselines": {
