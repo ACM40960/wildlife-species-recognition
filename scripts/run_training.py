@@ -5,9 +5,10 @@ Examples:
     # Train on the real NTLNP data laid out under data/ntlnp/<species>/
     python scripts/run_training.py --data-dir data/ntlnp --epochs 15
 
-    # Quick demo on synthetic data (few epochs, CPU-friendly)
-    python scripts/run_training.py --data-dir data/synthetic --epochs 5 \
-        --image-size 128 --output-dir results/demo
+    # Real infrared night-vision demo dataset (Caltech Camera Traps subset)
+    python scripts/run_training.py --data-dir data/night_wildlife --epochs 16 \
+        --image-size 224 --pretrained --grayscale --freeze-until layer2 \
+        --output-dir results/demo
 """
 import argparse
 import os

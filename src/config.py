@@ -1,8 +1,8 @@
 """Experiment configuration.
 
-A single dataclass holds every knob the pipeline needs so that training,
-evaluation, and the synthetic-data demo all read from one place. Values can be
-overridden on the command line by the scripts in ``scripts/``.
+A single dataclass holds every knob the pipeline needs so that training and
+evaluation read from one place. Values can be overridden on the command line by
+the scripts in ``scripts/``.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import json
 @dataclass
 class Config:
     # --- Data ---
-    data_dir: str = "data/ntlnp"          # root with one sub-folder per class
+    data_dir: str = "data/night_wildlife"  # root with one sub-folder per class
     image_size: int = 224                  # square input size fed to the CNN
     val_fraction: float = 0.15             # split fractions (train = remainder)
     test_fraction: float = 0.15

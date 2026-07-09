@@ -6,7 +6,7 @@ Package modules:
     model       -- transfer-learning model builder
     train       -- training / validation loop
     evaluate    -- metrics, confusion matrix, baseline comparison
-    synthetic   -- synthetic night-vision dataset generator (for demos/CI)
+    detect      -- optional YOLOv8 detect-and-crop stage
     utils       -- seeding, logging, plotting helpers
 """
 

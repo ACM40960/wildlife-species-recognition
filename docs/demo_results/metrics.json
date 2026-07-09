@@ -1,70 +1,70 @@
 {
-  "test_accuracy": 0.7466666666666667,
-  "precision_macro": 0.7537117131498959,
-  "recall_macro": 0.7466666666666667,
-  "f1_macro": 0.7481135862395233,
-  "precision_weighted": 0.7537117131498958,
-  "recall_weighted": 0.7466666666666667,
-  "f1_weighted": 0.7481135862395233,
-  "n_test": 450,
+  "test_accuracy": 0.7722222222222223,
+  "precision_macro": 0.7739760080277321,
+  "recall_macro": 0.7722222222222221,
+  "f1_macro": 0.7714884795788942,
+  "precision_weighted": 0.7739760080277321,
+  "recall_weighted": 0.7722222222222223,
+  "f1_weighted": 0.7714884795788942,
+  "n_test": 180,
   "n_classes": 6,
   "class_names": [
-    "bird",
-    "cat",
+    "bobcat",
+    "coyote",
     "deer",
-    "dog",
-    "frog",
-    "horse"
+    "opossum",
+    "rabbit",
+    "raccoon"
   ],
   "per_class": {
-    "bird": {
-      "precision": 0.8095238095238095,
-      "recall": 0.68,
-      "f1-score": 0.7391304347826086,
-      "support": 75.0
+    "bobcat": {
+      "precision": 0.7,
+      "recall": 0.7,
+      "f1-score": 0.7,
+      "support": 30.0
     },
-    "cat": {
-      "precision": 0.5888888888888889,
-      "recall": 0.7066666666666667,
-      "f1-score": 0.6424242424242425,
-      "support": 75.0
+    "coyote": {
+      "precision": 0.7777777777777778,
+      "recall": 0.7,
+      "f1-score": 0.7368421052631579,
+      "support": 30.0
     },
     "deer": {
-      "precision": 0.7341772151898734,
-      "recall": 0.7733333333333333,
-      "f1-score": 0.7532467532467533,
-      "support": 75.0
+      "precision": 0.875,
+      "recall": 0.9333333333333333,
+      "f1-score": 0.9032258064516129,
+      "support": 30.0
     },
-    "dog": {
-      "precision": 0.7,
-      "recall": 0.6533333333333333,
-      "f1-score": 0.6758620689655173,
-      "support": 75.0
+    "opossum": {
+      "precision": 0.6857142857142857,
+      "recall": 0.8,
+      "f1-score": 0.7384615384615385,
+      "support": 30.0
     },
-    "frog": {
-      "precision": 0.863013698630137,
-      "recall": 0.84,
-      "f1-score": 0.8513513513513513,
-      "support": 75.0
+    "rabbit": {
+      "precision": 0.8275862068965517,
+      "recall": 0.8,
+      "f1-score": 0.8135593220338984,
+      "support": 30.0
     },
-    "horse": {
-      "precision": 0.8266666666666667,
-      "recall": 0.8266666666666667,
-      "f1-score": 0.8266666666666667,
-      "support": 75.0
+    "raccoon": {
+      "precision": 0.7777777777777778,
+      "recall": 0.7,
+      "f1-score": 0.7368421052631579,
+      "support": 30.0
     },
-    "accuracy": 0.7466666666666667,
+    "accuracy": 0.7722222222222223,
     "macro avg": {
-      "precision": 0.7537117131498959,
-      "recall": 0.7466666666666667,
-      "f1-score": 0.7481135862395233,
-      "support": 450.0
+      "precision": 0.7739760080277321,
+      "recall": 0.7722222222222221,
+      "f1-score": 0.7714884795788942,
+      "support": 180.0
     },
     "weighted avg": {
-      "precision": 0.7537117131498958,
-      "recall": 0.7466666666666667,
-      "f1-score": 0.7481135862395233,
-      "support": 450.0
+      "precision": 0.7739760080277321,
+      "recall": 0.7722222222222223,
+      "f1-score": 0.7714884795788942,
+      "support": 180.0
     }
   },
   "baselines": {

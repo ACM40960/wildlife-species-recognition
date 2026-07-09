@@ -67,13 +67,23 @@ this reason.
 *Redmon, J., Divvala, S., Girshick, R. & Farhadi, A. (2016). You Only Look Once:
 Unified, real-time object detection. CVPR.*
 
-### 2.5 The dataset — NTLNP
-The NTLNP night-time/low-light nature-photography wildlife dataset provides
+### 2.5 The datasets — NTLNP and Caltech Camera Traps
+The **NTLNP** night-time/low-light nature-photography wildlife dataset provides
 paired day (colour) and night (infrared) camera-trap imagery across several
 species, making it purpose-built for studying the day-vs-night accuracy gap that
 is the focus of this project.
 *Dataset: https://paperswithcode.com/dataset/ntlnp-wildlife-image-dataset ·
 Code/data: https://github.com/myyyyw/NTLNP*
+
+For a reachable, openly-hosted source of the same *class* of data, this
+implementation also uses **Caltech Camera Traps (CCT)** (Beery et al., ECCV
+2018): ~243k U.S.-Southwest camera-trap frames with species labels and capture
+timestamps. At night the traps switch to infrared, producing exactly the
+grayscale, low-contrast frames NTLNP is made of. The committed demo dataset is an
+infrared-only, night-only subset of CCT (six wild species), pulled from the LILA
+BC Google-Cloud mirror.
+*Beery, S., Van Horn, G. & Perona, P. (2018). Recognition in Terra Incognita.
+ECCV. Data: https://lila.science/datasets/caltech-camera-traps*
 
 ## 3. Where this project sits
 

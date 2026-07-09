@@ -7,13 +7,14 @@ venv/
 env/
 
 # Datasets: never commit the large raw NTLNP data, but DO commit the small
-# ready-to-run real-image dataset so the repo works straight after `git clone`.
+# ready-to-run real infrared night-vision dataset so the repo works after clone.
 data/*
 !data/.gitkeep
-!data/real_animals/
+!data/night_wildlife/
 data/ntlnp/
 data/ntlnp_raw/
 CIFAR-10-images/
+.cct_cache/
 
 # Training artifacts
 *.pt
