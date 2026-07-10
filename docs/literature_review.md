@@ -18,8 +18,8 @@ The problem is materially harder at **night**. Most traps switch to an infrared
 appear as rough, partly-lit outlines against a dark background. Models trained on
 ordinary daytime colour photographs tend to degrade on this imagery. This project
 studies how well a modern machine-learning classifier copes with exactly that
-low-light regime, using the **NTLNP** night-time / low-light nature-photography
-dataset.
+low-light regime, using an infrared, night-only subset of the **Caltech Camera
+Traps** dataset.
 
 ## 2. Key prior work
 
@@ -67,21 +67,14 @@ this reason.
 *Redmon, J., Divvala, S., Girshick, R. & Farhadi, A. (2016). You Only Look Once:
 Unified, real-time object detection. CVPR.*
 
-### 2.5 The datasets — NTLNP and Caltech Camera Traps
-The **NTLNP** night-time/low-light nature-photography wildlife dataset provides
-paired day (colour) and night (infrared) camera-trap imagery across several
-species, making it purpose-built for studying the day-vs-night accuracy gap that
-is the focus of this project.
-*Dataset: https://paperswithcode.com/dataset/ntlnp-wildlife-image-dataset ·
-Code/data: https://github.com/myyyyw/NTLNP*
-
-For a reachable, openly-hosted source of the same *class* of data, this
-implementation also uses **Caltech Camera Traps (CCT)** (Beery et al., ECCV
-2018): ~243k U.S.-Southwest camera-trap frames with species labels and capture
-timestamps. At night the traps switch to infrared, producing exactly the
-grayscale, low-contrast frames NTLNP is made of. The committed demo dataset is an
-infrared-only, night-only subset of CCT (six wild species), pulled from the LILA
-BC Google-Cloud mirror.
+### 2.5 The dataset — Caltech Camera Traps
+This project uses **Caltech Camera Traps (CCT)** (Beery et al., ECCV 2018):
+~243k camera-trap frames from the U.S. Southwest, each with a species label and a
+capture timestamp. At night the traps switch to an infrared flash, producing the
+grayscale, low-contrast frames this project is about. We build an infrared-only,
+night-only subset of CCT (six wild species: bobcat, coyote, raccoon, opossum,
+rabbit, deer), pulled from the LILA BC Google-Cloud mirror, keeping only frames
+verified to be grayscale and de-duplicating by capture sequence.
 *Beery, S., Van Horn, G. & Perona, P. (2018). Recognition in Terra Incognita.
 ECCV. Data: https://lila.science/datasets/caltech-camera-traps*
 
@@ -92,15 +85,15 @@ ECCV. Data: https://lila.science/datasets/caltech-camera-traps*
 | Norouzzadeh 2018 | Serengeti, in-distribution | >93% (expert-level) | upper baseline |
 | Tabak 2019 | cross-region transfer | high with adaptation | motivates transfer learning |
 | Schneider 2020 | out-of-location | can drop below 70% | worst-case baseline |
-| **This project** | **NTLNP night-vision** | **measured on held-out test set** | **contribution** |
+| **This project** | **infrared night-vision (CCT subset)** | **measured on held-out test set** | **contribution** |
 
 The gap in the literature this project targets is the **specific low-light /
 infrared regime**: prior benchmarks are dominated by daytime colour imagery, and
 the works above show both that the task is solvable (2.1) and that it is fragile
-under distribution shift (2.3). By training a transfer-learned CNN on NTLNP and
-reporting accuracy, precision, and recall against these published baselines, we
-quantify how much of the expert-level performance survives when the images are
-grayscale, low-contrast night-vision frames.
+under distribution shift (2.3). By training a transfer-learned CNN on an infrared
+night-vision subset and reporting accuracy, precision, and recall against these
+published baselines, we quantify how much of the expert-level performance
+survives when the images are grayscale, low-contrast night-vision frames.
 
 ## 4. Method implied by the review
 

@@ -1,18 +1,18 @@
-"""Dataset loading, splitting, and preprocessing for NTLNP-style data.
+"""Dataset loading, splitting, and preprocessing.
 
 Expected on-disk layout (one folder per species, ``ImageFolder`` style)::
 
-    data/ntlnp/
-        amur_leopard/   img001.jpg ...
-        amur_tiger/     ...
-        red_fox/        ...
-        wild_boar/      ...
+    data/night_wildlife/
+        bobcat/    img001.jpg ...
+        coyote/    ...
+        raccoon/   ...
+        deer/      ...
 
-The NTLNP dataset (https://github.com/myyyyw/NTLNP) ships day/colour and
-night/infrared frames. This loader treats every image the same way: it is read,
-optionally forced through a grayscale->RGB path (infrared frames are single
-channel), resized, and normalised with ImageNet statistics so the pretrained
-backbone sees inputs in the distribution it expects.
+The night-vision camera-trap frames are infrared (single channel). This loader
+treats every image the same way: it is read, optionally forced through a
+grayscale->RGB path (so infrared frames match the 3-channel backbone), resized,
+and normalised with ImageNet statistics so the pretrained backbone sees inputs in
+the distribution it expects.
 
 The split is stratified and deterministic given the seed, so the same image
 never leaks between train / val / test across runs.

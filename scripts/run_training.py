@@ -2,8 +2,9 @@
 """Train the transfer-learning model.
 
 Examples:
-    # Train on the real NTLNP data laid out under data/ntlnp/<species>/
-    python scripts/run_training.py --data-dir data/ntlnp --epochs 15
+    # Train on the infrared night-vision data under data/night_wildlife/<species>/
+    python scripts/run_training.py --data-dir data/night_wildlife --epochs 16 \
+        --pretrained --grayscale --freeze-until layer2
 
     # Real infrared night-vision demo dataset (Caltech Camera Traps subset)
     python scripts/run_training.py --data-dir data/night_wildlife --epochs 16 \
@@ -35,7 +36,7 @@ def build_config() -> Config:
     ap.add_argument("--no-pretrained", dest="pretrained", action="store_false",
                     help="train the backbone from scratch (offline/CI)")
     ap.add_argument("--grayscale", dest="grayscale_to_rgb", action="store_true", default=None,
-                    help="force grayscale->RGB (the NTLNP infrared path; default)")
+                    help="force grayscale->RGB (the infrared path; default)")
     ap.add_argument("--no-grayscale", dest="grayscale_to_rgb", action="store_false",
                     help="keep colour input (for ordinary colour photo datasets)")
     ap.add_argument("--output-dir", default=None)

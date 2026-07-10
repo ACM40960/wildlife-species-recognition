@@ -1,4 +1,4 @@
-"""AI animal image recognition on night-vision camera-trap images (NTLNP).
+"""AI animal image recognition on night-vision (infrared) camera-trap images.
 
 Package modules:
     config      -- experiment configuration dataclass

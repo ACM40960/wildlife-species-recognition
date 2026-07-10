@@ -18,7 +18,7 @@
   "device": "cpu",
   "output_dir": "results/demo",
   "checkpoint_name": "best_model.pt",
-  "experiment_name": "ntlnp_resnet18",
+  "experiment_name": "night_wildlife_resnet18",
   "baselines": {
     "Norouzzadeh 2018 (Serengeti, expert-level)": 0.935,
     "Schneider 2020 (out-of-location, worst case)": 0.7

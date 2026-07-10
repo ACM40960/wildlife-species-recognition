@@ -41,7 +41,7 @@ class Config:
     device: str = "auto"                   # auto | cpu | cuda
     output_dir: str = "results"
     checkpoint_name: str = "best_model.pt"
-    experiment_name: str = "ntlnp_resnet18"
+    experiment_name: str = "night_wildlife_resnet18"
 
     # Published baselines to plot our test accuracy against (see docs).
     baselines: dict = field(default_factory=lambda: {

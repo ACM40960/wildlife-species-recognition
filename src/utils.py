@@ -87,7 +87,7 @@ def plot_confusion_matrix(cm: np.ndarray, class_names: Sequence[str], out_path: 
 
 
 def plot_baseline_comparison(our_acc: float, baselines: dict, out_path: str,
-                             our_label: str = "This project (NTLNP night-vision)") -> None:
+                             our_label: str = "This project (infrared night-vision)") -> None:
     """Bar chart comparing our test accuracy against published baselines."""
     import matplotlib
     matplotlib.use("Agg")

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Build a real night-vision (infrared) wildlife dataset from Caltech Camera Traps.
 
-The project targets night-vision / infrared camera-trap imagery. The real NTLNP
-dataset is hosted on Hugging Face, which the build sandbox blocks. The LILA BC
-repository, however, mirrors the **Caltech Camera Traps (CCT)** dataset on Google
-Cloud Storage (storage.googleapis.com), which *is* reachable — so this script
-assembles a genuine infrared night-vision wildlife dataset from it.
+The project targets night-vision / infrared camera-trap imagery. The LILA BC
+repository hosts the **Caltech Camera Traps (CCT)** dataset on Google Cloud
+Storage (storage.googleapis.com), so this script assembles a genuine infrared
+night-vision wildlife dataset from it.
 
 CCT contains ~243k camera-trap frames from the U.S. Southwest with species
 labels and capture timestamps. At night the traps switch to an infrared flash,
