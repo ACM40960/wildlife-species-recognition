@@ -14,20 +14,20 @@ The background reading and the baselines we compare against are in
 
 ## The dataset
 
-The project's target dataset is [NTLNP](https://github.com/myyyyw/NTLNP)
-(infrared night images of 17 species from the Northeast Tiger & Leopard National
-Park). To make the repo work out of the box we also include a smaller, ready-made
-dataset of **real infrared night-vision images** in
+We use real infrared night-vision camera-trap images from the **Caltech Camera
+Traps** dataset (Beery et al., 2018), downloaded through the
+[LILA BC](https://lila.science/datasets/caltech-camera-traps) Google Cloud mirror.
+A ready-made subset is included in the repo at
 [`data/night_wildlife/`](data/night_wildlife):
 
 - 6 species: bobcat, coyote, raccoon, opossum, rabbit, deer
 - 200 images per species (1,200 total)
 - every image is a genuine night infrared frame (checked to be grayscale)
 
-These come from the **Caltech Camera Traps** dataset (Beery et al., 2018),
-downloaded through the [LILA BC](https://lila.science/datasets/caltech-camera-traps)
-Google Cloud mirror with `scripts/build_night_wildlife.py`. They are the same
-kind of data as NTLNP — infrared, low-light wildlife camera traps.
+`scripts/build_night_wildlife.py` builds this subset: it keeps only night
+captures that are actually grayscale (real infrared), and de-duplicates by
+capture sequence so near-identical burst frames don't end up split across
+training and test.
 
 ## How to run it
 
@@ -99,24 +99,9 @@ the literature: accuracy on night infrared camera-trap images sits well below th
 ![training curves](docs/demo_results/training_curves.png)
 ![confusion matrix](docs/demo_results/confusion_matrix.png)
 
-## Using the full NTLNP dataset
+## Making the dataset bigger
 
-NTLNP is 25,657 infrared images across 17 species, hosted on Hugging Face:
-
-```bash
-bash scripts/download_ntlnp.sh          # needs git-lfs
-```
-
-Put it into one folder per species (`data/ntlnp/<species>/`) and train the same
-way, pointing `--data-dir` at it:
-
-```bash
-python scripts/run_training.py --data-dir data/ntlnp --pretrained --grayscale \
-    --freeze-until layer2 --epochs 15 --output-dir results/ntlnp
-python scripts/run_evaluation.py --output-dir results/ntlnp
-```
-
-You can also make the demo dataset bigger or add species:
+You can pull more images per class, or add more species, straight from the mirror:
 
 ```bash
 python scripts/build_night_wildlife.py --out data/night_wildlife \
@@ -127,7 +112,7 @@ python scripts/build_night_wildlife.py --out data/night_wildlife \
 
 ```
 src/        config, data loading + preprocessing, model, training, evaluation, detection
-scripts/    build the dataset, download NTLNP, train, evaluate, predict
+scripts/    build the dataset, train, evaluate, predict
 docs/       literature review + saved result plots
 data/       the ready-made infrared dataset
 ```
@@ -151,4 +136,3 @@ Main design choices:
 
 Caltech Camera Traps — Beery, Van Horn & Perona, *Recognition in Terra Incognita*,
 ECCV 2018, via LILA BC (https://lila.science/datasets/caltech-camera-traps).
-NTLNP — https://github.com/myyyyw/NTLNP.
