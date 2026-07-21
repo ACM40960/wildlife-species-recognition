@@ -99,6 +99,19 @@ the literature: accuracy on night infrared camera-trap images sits well below th
 ![training curves](docs/demo_results/training_curves.png)
 ![confusion matrix](docs/demo_results/confusion_matrix.png)
 
+## Known limitations
+
+- The train/val/test split is stratified by species and de-duplicated by capture
+  sequence, but it is **not** split by camera location. Because Caltech Camera
+  Traps images from the same site share backgrounds, some of the reported 0.77
+  accuracy may come from background cues rather than the animal itself. A
+  location-held-out split is planned (see
+  [Issue #1](https://github.com/srivanik8/final-project/issues/1)).
+- The YOLOv8 detection stage in `src/detect.py` is optional and **not yet part of
+  the reported results** (see
+  [Issue #2](https://github.com/srivanik8/final-project/issues/2)).
+- 200 images per species is small, so behaviour on rare species is untested.
+
 ## Making the dataset bigger
 
 You can pull more images per class, or add more species, straight from the mirror:
