@@ -130,20 +130,10 @@ docs/       literature review + saved result plots
 data/       the ready-made infrared dataset
 ```
 
-Main design choices:
-
-- **Preprocessing** — infrared frames are single-channel, so we convert them to
-  3 channels and normalise with ImageNet stats. Training adds random crops,
-  flips, rotations and brightness/contrast jitter.
-- **Model** — ResNet-18 pretrained on ImageNet, with a new final layer for our
-  species. Early layers are frozen and the later layers are retrained (transfer
-  learning).
-- **Training** — class weighting for imbalance, label smoothing, AdamW with a
-  cosine schedule, early stopping, and saving the best checkpoint.
-- **Evaluation** — accuracy, precision, recall, F1 (per class and averaged), a
-  confusion matrix, and a comparison against published baselines.
-- **Detection (optional)** — `src/detect.py` can use YOLOv8 to crop to the animal
-  before classifying, which removes background. Install `ultralytics` to use it.
+In short: ImageNet-pretrained ResNet-18, infrared grayscale input, later layers
+retrained, with class weighting, augmentation, and early stopping. The full
+pipeline — data selection, preprocessing, model, training, and evaluation
+settings — is documented in [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md).
 
 ## Credit
 
