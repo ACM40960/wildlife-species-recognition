@@ -24,15 +24,27 @@ A ready-made subset is included in the repo at
 - 200 images per species (1,200 total)
 - every image is a genuine night infrared frame (checked to be grayscale)
 
-`scripts/build_night_wildlife.py` builds this subset. It keeps only night
-captures that are actually grayscale (real infrared), de-duplicates by capture
-sequence, spreads images across many camera sites, and **crops to the animal's
-bounding box** where CCT provides one (otherwise an aspect-preserving letterbox —
-never a blind centre-crop that could slice the animal out). Every image is
-recorded in [`data/night_wildlife/manifest.csv`](data/night_wildlife/manifest.csv)
-with its source id, original filename, class, camera location, sequence id,
-timestamp, split, and SHA-256 checksum, so the dataset is verifiable and the
-split reproducible.
+`scripts/build_night_wildlife.py` builds this subset. It:
+
+- keeps only night captures that are actually grayscale (real infrared),
+  single-species, and de-duplicated by capture sequence;
+- samples **deterministically** and **stratified across camera locations and
+  time** (round-robin over sites, spread across each site's date range) to reduce
+  selection bias — the committed build spans 35–75 locations and 18–36 months per
+  species;
+- stores the frame **uncropped** (only downscaled) and records the animal's
+  bounding box in the manifest; the crop to the animal is applied at *load* time
+  (`crop_to_bbox`, see `src/data.py`), so nothing is baked into the files;
+- reports every rejected/failed download with its id and reason
+  (`build_report.txt`) and wipes the output directory first so a re-run can't
+  leave stale files.
+
+Every image is recorded in
+[`data/night_wildlife/manifest.csv`](data/night_wildlife/manifest.csv) with its
+source id, original filename, class, camera location, sequence id, timestamp,
+month/season, bounding box, split, and SHA-256 checksum.
+`python scripts/validate_dataset.py` checks class balance, file integrity,
+split/location overlap, and manifest↔file consistency before training.
 
 **Split.** Frames from the same camera share backgrounds, so the split is
 **location-held-out**: whole camera sites go to a single split (train / val /
@@ -93,35 +105,34 @@ of training so the model cannot lean on backgrounds it has already seen.
 
 | Split | What it measures | Test acc | Macro F1 |
 |-------|------------------|----------|----------|
-| **Location-held-out** | generalisation to **new camera sites** (the honest number) | **0.37** | 0.35 |
-| Same-location (stratified) | preliminary — shares backgrounds with training | 0.73 | 0.73 |
+| **Location-held-out** | generalisation to **new camera sites** (the honest number) | **0.51** | 0.51 |
+| Same-location (stratified) | shares backgrounds with training | 0.61 | 0.61 |
 
-Random guessing with 6 classes is 0.17, so the model does learn something about
-the animals — but the drop from 0.73 to **0.37** when locations are held out shows
-that most of the same-location score came from **recognising the background, not
-the animal**. The location-held-out 0.37 is the number to trust; the 0.73 should
-be read only as a same-location upper bound.
+Random guessing with 6 classes is 0.17. Because the model is trained on the
+animal crop rather than the whole frame, the same-location advantage is small
+(0.61 vs **0.51**) — i.e. the score reflects the animal, not the background. The
+location-held-out **0.51** is the number to trust.
 
-Per-species, location-held-out split (test = 356 images):
+Per-species, location-held-out split (test = 233 images):
 
 | Species  | Precision | Recall | F1   | Test images |
 |----------|-----------|--------|------|-------------|
-| coyote   | 0.41      | 0.54   | 0.47 | 69 |
-| deer     | 0.42      | 0.40   | 0.41 | 77 |
-| rabbit   | 0.32      | 0.47   | 0.38 | 47 |
-| opossum  | 0.37      | 0.25   | 0.30 | 75 |
-| raccoon  | 0.32      | 0.25   | 0.28 | 40 |
-| bobcat   | 0.29      | 0.25   | 0.27 | 48 |
+| deer     | 0.66      | 0.69   | 0.68 | 36 |
+| rabbit   | 0.70      | 0.63   | 0.66 | 51 |
+| opossum  | 0.75      | 0.44   | 0.56 | 34 |
+| bobcat   | 0.32      | 0.56   | 0.41 | 41 |
+| raccoon  | 0.52      | 0.33   | 0.41 | 33 |
+| coyote   | 0.33      | 0.32   | 0.32 | 38 |
 
 ![training curves](docs/demo_results/training_curves.png)
 ![confusion matrix](docs/demo_results/confusion_matrix.png)
 
 ## Known limitations
 
-- The 0.37 is from a **small** dataset (200 images/species) with only six species;
+- The 0.51 is from a **small** dataset (200 images/species) with only six species;
   behaviour on rare species and at larger scale is untested.
-- Bounding boxes exist for only ~28% of the frames; the rest use a whole-frame
-  letterbox, so some test images still contain background around the animal.
+- Bounding boxes cover ~50% of the frames; the rest are classified from the whole
+  (letterboxed) frame, so some test images still include background.
 - The YOLOv8 detection stage in `src/detect.py` is optional and **not yet part of
   the reported results** (see
   [Issue #2](https://github.com/srivanik8/final-project/issues/2)).

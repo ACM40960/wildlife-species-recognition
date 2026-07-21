@@ -14,27 +14,30 @@ mirror by `scripts/build_night_wildlife.py`.
 
 - labelled with one of six wild species — bobcat, coyote, raccoon, opossum,
   rabbit, deer;
+- **single-species** — frames annotated with more than one species are excluded
+  (this is single-label classification);
 - captured at **night** (local capture hour 19:00–06:59, from the `date_captured`
   field);
 - verified to be **grayscale infrared** — the mean HSV saturation of the
   downloaded image is below 6 (daytime colour frames sit around 80);
-- **de-duplicated by capture sequence** (`seq_id`): at most one frame per burst,
-  so near-identical frames don't inflate the dataset;
-- **spread across camera locations** — a per-location cap (default 20 images per
-  species per site) stops any single camera dominating a class, so the
-  location-held-out split below has enough distinct sites to work with (16–31
-  locations per species).
+- **de-duplicated by capture sequence** (`seq_id`): at most one frame per burst.
 
-**Cropping.** We do **not** blindly centre-crop, because that can slice the
-animal out of frame. Instead:
+**Deterministic, stratified sampling.** Candidates are chosen in a fixed order
+*before* any download, so filenames and which images are kept do not depend on
+which concurrent download finishes first (re-running with the same seed is
+byte-identical). Selection is stratified across **camera locations and time**:
+within each location the frames are sorted by date and sampled at even intervals
+across the whole range, then locations are visited round-robin. A per-location cap
+(default 20) stops any one site dominating a class. The committed build spans
+35–75 locations and 18–36 months per species.
 
-- if the CCT metadata provides a **bounding box** for the frame, we crop to it
-  (with 15% padding), then letterbox to 224×224;
-- otherwise we use an **aspect-preserving letterbox** — resize the whole frame so
-  the long side is 224 and pad the short side — so the animal is never cut and the
-  aspect ratio is never distorted.
-
-The committed subset is 200 images per species (1,200 total).
+**Non-destructive storage.** The downloaded frame is stored **uncropped** — only
+downscaled to `--store-size` (default 384 px long side) — as grayscale JPEG. The
+animal's bounding box is recorded in the manifest and the **crop is applied at
+load time** (`crop_to_bbox`, `src/data.py`): if a box exists the loader crops to
+it (15% padding); otherwise the whole frame is used. Nothing is baked into the
+files, so the crop strategy (box vs. whole frame) is a runtime choice and the
+originals are preserved. ~50% of the committed frames carry a bounding box.
 
 **Split — location-held-out.** Camera-trap frames from the same site share
 backgrounds, so a random split lets the model recognise the *location* instead of
@@ -42,15 +45,17 @@ the *animal*. `src/split.py` therefore assigns whole camera **locations** to a
 single split (70/15/15 by image count, targeted per species so every species
 appears in every split). No location — and therefore no background — is shared
 between train, validation and test. The assignment is deterministic given the
-seed and is recorded in the dataset manifest (below); `src/data.py` reads the
-split straight from the manifest. A stratified random split is still available
-(`--split-by`/`split_by="stratified"`) for comparison.
+seed and recorded in the manifest; `src/data.py` reads it. A stratified random
+split is still available (`--split-by stratified`) for comparison.
 
-**Manifest.** `scripts/build_night_wildlife.py` writes
-`data/night_wildlife/manifest.csv`, one row per image, recording: assigned split,
-class, saved filename, source CCT image id, original filename, camera location,
-sequence id, capture timestamp, whether a bounding box was used, and a SHA-256
-checksum. This makes the dataset verifiable and the experiment reproducible.
+**Manifest & validation.** `scripts/build_night_wildlife.py` writes
+`data/night_wildlife/manifest.csv`, one row per image: split, class, saved
+filename, source CCT image id, original filename, camera location, sequence id,
+timestamp, month, season, bounding box, whether a box exists, and a SHA-256
+checksum. It also writes `build_report.txt` logging every rejected/failed
+download with its id and reason. `scripts/validate_dataset.py` then checks class
+balance, file integrity (checksums + openability), split/location overlap, and
+manifest↔file consistency — run it before training.
 
 ## 2. Preprocessing and augmentation
 
