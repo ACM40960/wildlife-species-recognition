@@ -19,17 +19,38 @@ mirror by `scripts/build_night_wildlife.py`.
 - verified to be **grayscale infrared** — the mean HSV saturation of the
   downloaded image is below 6 (daytime colour frames sit around 80);
 - **de-duplicated by capture sequence** (`seq_id`): at most one frame per burst,
-  so near-identical frames don't inflate the dataset.
+  so near-identical frames don't inflate the dataset;
+- **spread across camera locations** — a per-location cap (default 20 images per
+  species per site) stops any single camera dominating a class, so the
+  location-held-out split below has enough distinct sites to work with (16–31
+  locations per species).
 
-Images are converted to grayscale, resized so the short side is 224 px, and
-centre-cropped to 224×224. The committed subset is 200 images per species
-(1,200 total).
+**Cropping.** We do **not** blindly centre-crop, because that can slice the
+animal out of frame. Instead:
 
-**Split.** `src/data.py` performs a **stratified** split — 70% train, 15%
-validation, 15% test — done per class so every species appears in every split.
-The split is deterministic given the seed (default 42), so no image moves between
-splits across runs. (Limitation: the split is not held out by camera *location* —
-see the README limitations and Issue #1.)
+- if the CCT metadata provides a **bounding box** for the frame, we crop to it
+  (with 15% padding), then letterbox to 224×224;
+- otherwise we use an **aspect-preserving letterbox** — resize the whole frame so
+  the long side is 224 and pad the short side — so the animal is never cut and the
+  aspect ratio is never distorted.
+
+The committed subset is 200 images per species (1,200 total).
+
+**Split — location-held-out.** Camera-trap frames from the same site share
+backgrounds, so a random split lets the model recognise the *location* instead of
+the *animal*. `src/split.py` therefore assigns whole camera **locations** to a
+single split (70/15/15 by image count, targeted per species so every species
+appears in every split). No location — and therefore no background — is shared
+between train, validation and test. The assignment is deterministic given the
+seed and is recorded in the dataset manifest (below); `src/data.py` reads the
+split straight from the manifest. A stratified random split is still available
+(`--split-by`/`split_by="stratified"`) for comparison.
+
+**Manifest.** `scripts/build_night_wildlife.py` writes
+`data/night_wildlife/manifest.csv`, one row per image, recording: assigned split,
+class, saved filename, source CCT image id, original filename, camera location,
+sequence id, capture timestamp, whether a bounding box was used, and a SHA-256
+checksum. This makes the dataset verifiable and the experiment reproducible.
 
 ## 2. Preprocessing and augmentation
 
@@ -83,20 +104,22 @@ same split and preprocessing.
 
 ## 5. Evaluation
 
-`src/evaluate.py` scores the best checkpoint on the held-out test split and
-writes:
+`src/evaluate.py` scores the best checkpoint on the location-held-out test split
+and writes:
 
 - **Metrics** (`metrics.json`): accuracy; precision, recall, and F1 both
   **macro-averaged** (each species weighted equally) and **weighted** (by
-  support); plus a full per-class report.
+  support); plus a full per-class report and the split strategy used.
 - **Confusion matrix** (`confusion_matrix.png`), row-normalised.
-- **Baseline comparison** (`baseline_comparison.png`): test accuracy against two
-  published baselines — Norouzzadeh et al. (2018), expert-level ~0.935, as the
-  upper bound; Schneider et al. (2020), out-of-location worst case ~0.70.
 
 Macro and weighted averages are both reported because the macro number is the
 honest one when class support is uneven — it does not let common species mask
 poor performance on rare ones.
+
+We deliberately do **not** plot our accuracy against the Norouzzadeh (2018) or
+Schneider (2020) numbers. Those studies used different datasets, species, and
+evaluation protocols, so a side-by-side bar chart would imply a comparison that
+isn't valid. They appear in the literature review as context only.
 
 ## 6. Optional detection stage
 

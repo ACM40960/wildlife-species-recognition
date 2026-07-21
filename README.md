@@ -24,10 +24,21 @@ A ready-made subset is included in the repo at
 - 200 images per species (1,200 total)
 - every image is a genuine night infrared frame (checked to be grayscale)
 
-`scripts/build_night_wildlife.py` builds this subset: it keeps only night
-captures that are actually grayscale (real infrared), and de-duplicates by
-capture sequence so near-identical burst frames don't end up split across
-training and test.
+`scripts/build_night_wildlife.py` builds this subset. It keeps only night
+captures that are actually grayscale (real infrared), de-duplicates by capture
+sequence, spreads images across many camera sites, and **crops to the animal's
+bounding box** where CCT provides one (otherwise an aspect-preserving letterbox —
+never a blind centre-crop that could slice the animal out). Every image is
+recorded in [`data/night_wildlife/manifest.csv`](data/night_wildlife/manifest.csv)
+with its source id, original filename, class, camera location, sequence id,
+timestamp, split, and SHA-256 checksum, so the dataset is verifiable and the
+split reproducible.
+
+**Split.** Frames from the same camera share backgrounds, so the split is
+**location-held-out**: whole camera sites go to a single split (train / val /
+test), and no background is shared between them. This is what makes the reported
+accuracy a measure of animal recognition rather than background recognition. See
+[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) for details.
 
 ## How to run it
 
@@ -76,41 +87,44 @@ Everything (checkpoint, `metrics.json`, and the plots) is written to
 
 ## Results
 
-Trained on the 1,200 infrared images above (70% train / 15% val / 15% test),
-16 epochs on CPU. Test set = 180 images, 30 per class.
+Trained on the 1,200 infrared images above, 16 epochs on CPU. The headline
+number is the **location-held-out** split, where whole camera sites are kept out
+of training so the model cannot lean on backgrounds it has already seen.
 
-**Overall test accuracy: 0.77** (random guessing would be 0.17 with 6 classes).
-Macro precision 0.77, recall 0.77, F1 0.77.
+| Split | What it measures | Test acc | Macro F1 |
+|-------|------------------|----------|----------|
+| **Location-held-out** | generalisation to **new camera sites** (the honest number) | **0.37** | 0.35 |
+| Same-location (stratified) | preliminary — shares backgrounds with training | 0.73 | 0.73 |
+
+Random guessing with 6 classes is 0.17, so the model does learn something about
+the animals — but the drop from 0.73 to **0.37** when locations are held out shows
+that most of the same-location score came from **recognising the background, not
+the animal**. The location-held-out 0.37 is the number to trust; the 0.73 should
+be read only as a same-location upper bound.
+
+Per-species, location-held-out split (test = 356 images):
 
 | Species  | Precision | Recall | F1   | Test images |
 |----------|-----------|--------|------|-------------|
-| deer     | 0.88      | 0.93   | 0.90 | 30 |
-| rabbit   | 0.83      | 0.80   | 0.81 | 30 |
-| coyote   | 0.78      | 0.70   | 0.74 | 30 |
-| raccoon  | 0.78      | 0.70   | 0.74 | 30 |
-| opossum  | 0.69      | 0.80   | 0.74 | 30 |
-| bobcat   | 0.70      | 0.70   | 0.70 | 30 |
-
-Deer are the easiest (distinct shape and legs); bobcat is the hardest, and most
-of its mistakes are with the other similarly-sized carnivores. This lines up with
-the literature: accuracy on night infrared camera-trap images sits well below the
-90%+ that models reach on clean daytime photos.
+| coyote   | 0.41      | 0.54   | 0.47 | 69 |
+| deer     | 0.42      | 0.40   | 0.41 | 77 |
+| rabbit   | 0.32      | 0.47   | 0.38 | 47 |
+| opossum  | 0.37      | 0.25   | 0.30 | 75 |
+| raccoon  | 0.32      | 0.25   | 0.28 | 40 |
+| bobcat   | 0.29      | 0.25   | 0.27 | 48 |
 
 ![training curves](docs/demo_results/training_curves.png)
 ![confusion matrix](docs/demo_results/confusion_matrix.png)
 
 ## Known limitations
 
-- The train/val/test split is stratified by species and de-duplicated by capture
-  sequence, but it is **not** split by camera location. Because Caltech Camera
-  Traps images from the same site share backgrounds, some of the reported 0.77
-  accuracy may come from background cues rather than the animal itself. A
-  location-held-out split is planned (see
-  [Issue #1](https://github.com/srivanik8/final-project/issues/1)).
+- The 0.37 is from a **small** dataset (200 images/species) with only six species;
+  behaviour on rare species and at larger scale is untested.
+- Bounding boxes exist for only ~28% of the frames; the rest use a whole-frame
+  letterbox, so some test images still contain background around the animal.
 - The YOLOv8 detection stage in `src/detect.py` is optional and **not yet part of
   the reported results** (see
   [Issue #2](https://github.com/srivanik8/final-project/issues/2)).
-- 200 images per species is small, so behaviour on rare species is untested.
 
 ## Making the dataset bigger
 
@@ -124,10 +138,10 @@ python scripts/build_night_wildlife.py --out data/night_wildlife \
 ## What's in the repo
 
 ```
-src/        config, data loading + preprocessing, model, training, evaluation, detection
+src/        config, data loading, location-grouped split, model, training, evaluation, detection
 scripts/    build the dataset, train, evaluate, predict
-docs/       literature review + saved result plots
-data/       the ready-made infrared dataset
+docs/       literature review, methodology, experiment log, saved result plots
+data/       the ready-made infrared dataset + manifest.csv
 ```
 
 In short: ImageNet-pretrained ResNet-18, infrared grayscale input, later layers

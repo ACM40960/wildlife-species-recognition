@@ -80,20 +80,24 @@ ECCV. Data: https://lila.science/datasets/caltech-camera-traps*
 
 ## 3. Where this project sits
 
-| Study | Setting | Reported accuracy | Role here |
-|-------|---------|-------------------|-----------|
-| Norouzzadeh 2018 | Serengeti, in-distribution | >93% (expert-level) | upper baseline |
-| Tabak 2019 | cross-region transfer | high with adaptation | motivates transfer learning |
-| Schneider 2020 | out-of-location | can drop below 70% | worst-case baseline |
-| **This project** | **infrared night-vision (CCT subset)** | **measured on held-out test set** | **contribution** |
+The studies below are **context, not directly comparable scores**. Each used a
+different dataset, a different set of species, and a different evaluation protocol
+(number of classes, in- vs out-of-location testing, presence/absence of empty
+frames), so their reported numbers cannot be lined up against ours as a
+leaderboard. They frame what is known about the problem:
 
-The gap in the literature this project targets is the **specific low-light /
-infrared regime**: prior benchmarks are dominated by daytime colour imagery, and
-the works above show both that the task is solvable (2.1) and that it is fragile
-under distribution shift (2.3). By training a transfer-learned CNN on an infrared
-night-vision subset and reporting accuracy, precision, and recall against these
-published baselines, we quantify how much of the expert-level performance
-survives when the images are grayscale, low-contrast night-vision frames.
+| Study | Setting | Reported accuracy | What it tells us |
+|-------|---------|-------------------|------------------|
+| Norouzzadeh 2018 | Serengeti, in-distribution, many classes | >93% (expert-level) | the task is solvable end-to-end at scale |
+| Tabak 2019 | cross-region transfer | high with adaptation | transfer learning adapts across regions |
+| Schneider 2020 | out-of-location | can drop below 70% | accuracy is fragile under location shift |
+
+The gap this project targets is the **specific low-light / infrared regime**:
+prior benchmarks are dominated by daytime colour imagery, and the works above show
+both that the task is solvable (2.1) and that it is fragile under distribution
+shift (2.3). We measure accuracy, precision and recall on our own infrared
+night-vision subset under a **location-held-out** split — the setting Schneider
+et al. show matters most — rather than comparing a headline number against theirs.
 
 ## 4. Method implied by the review
 
@@ -110,5 +114,6 @@ implements:
    (`src/detect.py`), following the detection literature (2.4) and mitigating the
    Schneider generalisation gap (2.3).
 4. **Evaluate** with accuracy, macro/weighted precision and recall, and a
-   confusion matrix, and plot the result against the Norouzzadeh and Schneider
-   baselines (`src/evaluate.py`).
+   confusion matrix on a location-held-out test set (`src/evaluate.py`). The
+   literature results above are reported as context, not as directly comparable
+   scores.
