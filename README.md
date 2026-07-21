@@ -135,6 +135,15 @@ retrained, with class weighting, augmentation, and early stopping. The full
 pipeline — data selection, preprocessing, model, training, and evaluation
 settings — is documented in [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md).
 
+## Contributors
+
+| Name | Student number | Main responsibility |
+|------|----------------|---------------------|
+| Srivani Konda (@srivanik8) | 25211398 | Data pipeline — dataset builder, preprocessing, and splits |
+| Navya Sri Mungamuri | 25200230 | Model, training, and evaluation |
+
+Both authors contributed to the literature review and the write-up.
+
 ## Credit
 
 Caltech Camera Traps — Beery, Van Horn & Perona, *Recognition in Terra Incognita*,
