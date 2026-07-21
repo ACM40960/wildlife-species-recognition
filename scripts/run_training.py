@@ -39,6 +39,10 @@ def build_config() -> Config:
                     help="force grayscale->RGB (the infrared path; default)")
     ap.add_argument("--no-grayscale", dest="grayscale_to_rgb", action="store_false",
                     help="keep colour input (for ordinary colour photo datasets)")
+    ap.add_argument("--split-by", dest="split_by", default=None,
+                    choices=["location", "stratified"],
+                    help="location = held-out camera sites (manifest); "
+                         "stratified = random per class (same-location)")
     ap.add_argument("--output-dir", default=None)
     ap.add_argument("--device", default=None, choices=["auto", "cpu", "cuda"])
     ap.add_argument("--seed", type=int, default=None)
@@ -47,7 +51,7 @@ def build_config() -> Config:
     cfg = Config()
     for key in ("data_dir", "backbone", "epochs", "batch_size", "learning_rate",
                 "image_size", "freeze_until", "pretrained", "grayscale_to_rgb",
-                "output_dir", "device", "seed"):
+                "split_by", "output_dir", "device", "seed"):
         val = getattr(args, key, None)
         if val is not None:
             setattr(cfg, key, val)

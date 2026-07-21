@@ -6,7 +6,7 @@ the scripts in ``scripts/``.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from typing import Optional
 import json
 
@@ -18,6 +18,9 @@ class Config:
     image_size: int = 224                  # square input size fed to the CNN
     val_fraction: float = 0.15             # split fractions (train = remainder)
     test_fraction: float = 0.15
+    split_by: str = "location"             # "location" (manifest, held-out sites)
+                                           # or "stratified" (random per class)
+    manifest_name: str = "manifest.csv"
     grayscale_to_rgb: bool = True          # IR frames are 1-channel; repeat to 3
     num_workers: int = 2
 
@@ -42,12 +45,6 @@ class Config:
     output_dir: str = "results"
     checkpoint_name: str = "best_model.pt"
     experiment_name: str = "night_wildlife_resnet18"
-
-    # Published baselines to plot our test accuracy against (see docs).
-    baselines: dict = field(default_factory=lambda: {
-        "Norouzzadeh 2018 (Serengeti, expert-level)": 0.935,
-        "Schneider 2020 (out-of-location, worst case)": 0.70,
-    })
 
     def resolved_device(self) -> str:
         if self.device != "auto":

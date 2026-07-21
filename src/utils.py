@@ -84,30 +84,3 @@ def plot_confusion_matrix(cm: np.ndarray, class_names: Sequence[str], out_path: 
     fig.tight_layout()
     fig.savefig(out_path, dpi=120)
     plt.close(fig)
-
-
-def plot_baseline_comparison(our_acc: float, baselines: dict, out_path: str,
-                             our_label: str = "This project (infrared night-vision)") -> None:
-    """Bar chart comparing our test accuracy against published baselines."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    labels = [our_label] + list(baselines.keys())
-    values = [our_acc] + list(baselines.values())
-    colors = ["#2a9d8f"] + ["#8d99ae"] * len(baselines)
-
-    fig, ax = plt.subplots(figsize=(9, 4.5))
-    bars = ax.barh(range(len(labels)), values, color=colors)
-    ax.set_yticks(range(len(labels)))
-    ax.set_yticklabels(labels)
-    ax.set_xlim(0, 1)
-    ax.set_xlabel("accuracy")
-    ax.set_title("Test accuracy vs. published baselines")
-    ax.invert_yaxis()
-    for bar, v in zip(bars, values):
-        ax.text(min(v + 0.01, 0.98), bar.get_y() + bar.get_height() / 2,
-                f"{v:.3f}", va="center", fontsize=9)
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)

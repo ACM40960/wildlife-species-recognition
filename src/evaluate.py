@@ -7,8 +7,7 @@ from typing import Dict
 
 from .data import load_datasets, make_loaders
 from .model import build_model
-from .utils import (ensure_dir, set_seed, plot_confusion_matrix,
-                    plot_baseline_comparison)
+from .utils import ensure_dir, set_seed, plot_confusion_matrix
 
 
 def _collect_predictions(net, loader, device):
@@ -70,22 +69,17 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
         "precision_macro": p_macro, "recall_macro": r_macro, "f1_macro": f_macro,
         "precision_weighted": p_w, "recall_weighted": r_w, "f1_weighted": f_w,
         "n_test": len(y_true), "n_classes": n_classes,
+        "split_by": getattr(cfg, "split_by", "location"),
         "class_names": class_names,
         "per_class": report,
-        "baselines": cfg.baselines,
     }
 
     with open(os.path.join(out, "metrics.json"), "w") as fh:
         json.dump(metrics, fh, indent=2)
     plot_confusion_matrix(cm, class_names, os.path.join(out, "confusion_matrix.png"))
-    plot_baseline_comparison(acc, cfg.baselines,
-                             os.path.join(out, "baseline_comparison.png"))
 
-    print(f"[test] n={len(y_true)}  accuracy={acc:.3f}")
+    print(f"[test] n={len(y_true)}  accuracy={acc:.3f}  (split={metrics['split_by']})")
     print(f"       precision(macro)={p_macro:.3f} recall(macro)={r_macro:.3f} "
           f"f1(macro)={f_macro:.3f}")
     print(f"       precision(w)={p_w:.3f} recall(w)={r_w:.3f} f1(w)={f_w:.3f}")
-    for name, base in cfg.baselines.items():
-        delta = acc - base
-        print(f"       vs {name}: {delta:+.3f}")
     return metrics

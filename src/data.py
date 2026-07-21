@@ -19,6 +19,7 @@ never leaks between train / val / test across runs.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -92,11 +93,43 @@ def _stratified_indices(targets: List[int], n_classes: int,
     return train_idx, val_idx, test_idx
 
 
-def load_datasets(cfg) -> Datasets:
-    """Load an ImageFolder dataset and produce stratified train/val/test subsets.
+def _manifest_indices(samples, data_dir, manifest_name):
+    """Split indices by the ``split`` column of the dataset manifest.
 
-    Val and test wrap the *same* underlying images but with evaluation-time
-    (non-augmenting) transforms, while train uses the augmenting pipeline.
+    The manifest records, per image, the camera location and the
+    location-grouped split it was assigned (see ``scripts/build_night_wildlife.py``
+    and ``src/split.py``). Splitting from it guarantees that whole camera
+    locations — and therefore backgrounds — never appear in more than one split.
+    Returns None if no manifest is present (caller falls back to stratified).
+    """
+    import csv
+
+    path = os.path.join(data_dir, manifest_name)
+    if not os.path.exists(path):
+        return None
+    split_of = {}
+    with open(path, newline="") as fh:
+        for row in csv.DictReader(fh):
+            split_of[row["filename"]] = row.get("split", "train")
+
+    buckets = {"train": [], "val": [], "test": []}
+    for i, (fpath, _label) in enumerate(samples):
+        rel = os.path.relpath(fpath, data_dir).replace(os.sep, "/")
+        split = split_of.get(rel)
+        if split in buckets:
+            buckets[split].append(i)
+    if not buckets["test"] or not buckets["train"]:
+        return None
+    return buckets["train"], buckets["val"], buckets["test"]
+
+
+def load_datasets(cfg) -> Datasets:
+    """Load an ImageFolder dataset and produce train/val/test subsets.
+
+    If ``cfg.split_by == "location"`` and a manifest is present, the split is
+    read from it (whole camera locations held out — no shared backgrounds).
+    Otherwise a stratified random split is used. Val and test wrap the same
+    underlying images with evaluation-time transforms; train uses augmentation.
     """
     from torch.utils.data import Subset
     from torchvision.datasets import ImageFolder
@@ -105,8 +138,17 @@ def load_datasets(cfg) -> Datasets:
     class_names = base.classes
     targets = [label for _, label in base.samples]
 
-    train_idx, val_idx, test_idx = _stratified_indices(
-        targets, len(class_names), cfg.val_fraction, cfg.test_fraction, cfg.seed)
+    indices = None
+    if getattr(cfg, "split_by", "location") == "location":
+        indices = _manifest_indices(base.samples, cfg.data_dir,
+                                    getattr(cfg, "manifest_name", "manifest.csv"))
+        if indices is not None:
+            print("[data] using location-grouped split from manifest")
+    if indices is None:
+        print("[data] using stratified random split")
+        indices = _stratified_indices(
+            targets, len(class_names), cfg.val_fraction, cfg.test_fraction, cfg.seed)
+    train_idx, val_idx, test_idx = indices
 
     train_tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=True)
     eval_tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=False)
