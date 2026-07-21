@@ -93,69 +93,113 @@ def _stratified_indices(targets: List[int], n_classes: int,
     return train_idx, val_idx, test_idx
 
 
-def _manifest_indices(samples, data_dir, manifest_name):
-    """Split indices by the ``split`` column of the dataset manifest.
-
-    The manifest records, per image, the camera location and the
-    location-grouped split it was assigned (see ``scripts/build_night_wildlife.py``
-    and ``src/split.py``). Splitting from it guarantees that whole camera
-    locations — and therefore backgrounds — never appear in more than one split.
-    Returns None if no manifest is present (caller falls back to stratified).
-    """
+def read_manifest(data_dir, manifest_name):
+    """Read manifest rows, or None if there is no manifest."""
     import csv
 
     path = os.path.join(data_dir, manifest_name)
     if not os.path.exists(path):
         return None
-    split_of = {}
     with open(path, newline="") as fh:
-        for row in csv.DictReader(fh):
-            split_of[row["filename"]] = row.get("split", "train")
+        return list(csv.DictReader(fh))
 
-    buckets = {"train": [], "val": [], "test": []}
-    for i, (fpath, _label) in enumerate(samples):
-        rel = os.path.relpath(fpath, data_dir).replace(os.sep, "/")
-        split = split_of.get(rel)
-        if split in buckets:
-            buckets[split].append(i)
-    if not buckets["test"] or not buckets["train"]:
+
+def _parse_bbox(raw):
+    if not raw:
         return None
-    return buckets["train"], buckets["val"], buckets["test"]
+    try:
+        x, y, w, h = (int(float(v)) for v in raw.split(";"))
+        return (x, y, w, h)
+    except Exception:
+        return None
+
+
+class ManifestDataset:
+    """Dataset driven by the manifest, cropping to the animal box at *load* time.
+
+    Stored frames are uncropped (see ``scripts/build_night_wildlife.py``); the
+    bounding box lives in the manifest and the crop is applied here, so nothing is
+    baked into the files and the crop strategy is a runtime choice.
+    """
+
+    def __init__(self, rows, data_dir, class_to_idx, transform,
+                 crop_to_bbox=True, bbox_pad=0.15):
+        from torch.utils.data import Dataset  # noqa: F401  (documents the interface)
+        self.rows = rows
+        self.data_dir = data_dir
+        self.class_to_idx = class_to_idx
+        self.transform = transform
+        self.crop_to_bbox = crop_to_bbox
+        self.bbox_pad = bbox_pad
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __getitem__(self, i):
+        from PIL import Image
+
+        row = self.rows[i]
+        img = Image.open(os.path.join(self.data_dir, row["filename"])).convert("RGB")
+        box = _parse_bbox(row.get("bbox", "")) if self.crop_to_bbox else None
+        if box is not None:
+            x, y, w, h = box
+            px, py = w * self.bbox_pad, h * self.bbox_pad
+            W, H = img.size
+            crop = (max(0, int(x - px)), max(0, int(y - py)),
+                    min(W, int(x + w + px)), min(H, int(y + h + py)))
+            if crop[2] - crop[0] > 5 and crop[3] - crop[1] > 5:
+                img = img.crop(crop)
+        return self.transform(img), self.class_to_idx[row["class"]]
 
 
 def load_datasets(cfg) -> Datasets:
-    """Load an ImageFolder dataset and produce train/val/test subsets.
+    """Produce train/val/test datasets.
 
-    If ``cfg.split_by == "location"`` and a manifest is present, the split is
-    read from it (whole camera locations held out — no shared backgrounds).
-    Otherwise a stratified random split is used. Val and test wrap the same
-    underlying images with evaluation-time transforms; train uses augmentation.
+    If ``cfg.split_by == "location"`` and a manifest is present, images are loaded
+    via :class:`ManifestDataset` with the location-grouped split from the manifest
+    (whole camera locations held out — no shared backgrounds) and cropped to the
+    animal box at load time. Otherwise a plain stratified random ImageFolder split
+    is used. Val/test use evaluation transforms; train uses augmentation.
     """
-    from torch.utils.data import Subset
-    from torchvision.datasets import ImageFolder
-
-    base = ImageFolder(cfg.data_dir)  # no transform yet; we attach per-split ones
-    class_names = base.classes
-    targets = [label for _, label in base.samples]
-
-    indices = None
+    rows = None
     if getattr(cfg, "split_by", "location") == "location":
-        indices = _manifest_indices(base.samples, cfg.data_dir,
-                                    getattr(cfg, "manifest_name", "manifest.csv"))
-        if indices is not None:
-            print("[data] using location-grouped split from manifest")
-    if indices is None:
-        print("[data] using stratified random split")
-        indices = _stratified_indices(
-            targets, len(class_names), cfg.val_fraction, cfg.test_fraction, cfg.seed)
-    train_idx, val_idx, test_idx = indices
+        rows = read_manifest(cfg.data_dir, getattr(cfg, "manifest_name", "manifest.csv"))
 
     train_tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=True)
     eval_tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=False)
 
+    if rows is not None:
+        print("[data] location-grouped split from manifest; crop_to_bbox="
+              f"{getattr(cfg, 'crop_to_bbox', True)}")
+        class_names = sorted({r["class"] for r in rows})
+        class_to_idx = {c: i for i, c in enumerate(class_names)}
+        by_split = {"train": [], "val": [], "test": []}
+        for r in rows:
+            if r.get("split") in by_split:
+                by_split[r["split"]].append(r)
+        crop = getattr(cfg, "crop_to_bbox", True)
+
+        def ds(split_rows, tf):
+            return ManifestDataset(split_rows, cfg.data_dir, class_to_idx, tf, crop)
+
+        return Datasets(
+            train=ds(by_split["train"], train_tf),
+            val=ds(by_split["val"], eval_tf),
+            test=ds(by_split["test"], eval_tf),
+            class_names=class_names,
+        )
+
+    # Fallback: stratified random split over a plain ImageFolder.
+    print("[data] stratified random split")
+    from torch.utils.data import Subset
+    from torchvision.datasets import ImageFolder
+
+    class_names = ImageFolder(cfg.data_dir).classes
+    targets = [label for _, label in ImageFolder(cfg.data_dir).samples]
+    train_idx, val_idx, test_idx = _stratified_indices(
+        targets, len(class_names), cfg.val_fraction, cfg.test_fraction, cfg.seed)
     train_ds = ImageFolder(cfg.data_dir, transform=train_tf)
     eval_ds = ImageFolder(cfg.data_dir, transform=eval_tf)
-
     return Datasets(
         train=Subset(train_ds, train_idx),
         val=Subset(eval_ds, val_idx),
@@ -177,12 +221,24 @@ def make_loaders(cfg, datasets: Datasets):
     )
 
 
+def _train_labels(train_ds):
+    """Training-split labels without decoding any images where possible."""
+    if isinstance(train_ds, ManifestDataset):
+        return [train_ds.class_to_idx[r["class"]] for r in train_ds.rows]
+    # torch Subset over an ImageFolder: read labels from .samples via indices.
+    dataset = getattr(train_ds, "dataset", None)
+    indices = getattr(train_ds, "indices", None)
+    if dataset is not None and indices is not None and hasattr(dataset, "samples"):
+        return [dataset.samples[i][1] for i in indices]
+    return [label for _, label in train_ds]  # last resort (decodes images)
+
+
 def class_weights(datasets: Datasets, n_classes: int):
     """Inverse-frequency class weights from the training split (for imbalance)."""
     import torch
 
     counts = np.zeros(n_classes, dtype=np.float64)
-    for _, label in datasets.train:
+    for label in _train_labels(datasets.train):
         counts[label] += 1
     counts = np.maximum(counts, 1.0)
     weights = counts.sum() / (n_classes * counts)

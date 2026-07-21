@@ -21,6 +21,8 @@ class Config:
     split_by: str = "location"             # "location" (manifest, held-out sites)
                                            # or "stratified" (random per class)
     manifest_name: str = "manifest.csv"
+    crop_to_bbox: bool = True              # crop to the animal box at load time
+                                           # (frames are stored uncropped)
     grayscale_to_rgb: bool = True          # IR frames are 1-channel; repeat to 3
     num_workers: int = 2
 
