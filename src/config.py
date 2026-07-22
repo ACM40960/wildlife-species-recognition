@@ -29,9 +29,10 @@ class Config:
     # --- Model ---
     backbone: str = "resnet18"             # resnet18 | resnet34 | resnet50
     pretrained: bool = True                # start from ImageNet weights
-    freeze_until: str = "layer4"           # freeze everything up to this block;
-                                           # "" trains all layers, "all" freezes
-                                           # the whole backbone (linear probe)
+    freeze_until: str = "layer2"           # freeze up to & incl. this block, then
+                                           # retrain layer3/layer4/head. "" trains
+                                           # all layers; "all"/"layer4" freeze the
+                                           # whole backbone (head-only / probe)
 
     # --- Training ---
     epochs: int = 15
@@ -43,6 +44,7 @@ class Config:
 
     # --- Runtime ---
     seed: int = 42
+    deterministic: bool = True             # enable deterministic torch algorithms
     device: str = "auto"                   # auto | cpu | cuda
     output_dir: str = "results"
     checkpoint_name: str = "best_model.pt"

@@ -1,25 +1,24 @@
+# Python 3.9–3.12 (tested on 3.11). These ranges bound each dependency below a
+# tested minimum and above the next major so an incompatible release can't be
+# pulled in. The exact versions this project was last verified against are noted
+# in each comment; `pip install -r requirements.txt` will resolve within range.
+
 # Core ML stack
-torch>=2.0
-torchvision>=0.15
+torch>=2.2,<3            # tested: 2.13
+torchvision>=0.17,<1     # tested: 0.28 (must match the installed torch build)
 
 # Data / numerics
-numpy>=1.24
-Pillow>=9.0
+numpy>=1.24,<3           # tested: 2.4
+Pillow>=9.5,<13          # tested: 12.3
 
 # Metrics, splitting, evaluation
-scikit-learn>=1.2
+scikit-learn>=1.3,<2     # tested: 1.9
 
-# Plotting (confusion matrices, training curves)
-matplotlib>=3.6
+# Plotting (confusion matrix, training curves)
+matplotlib>=3.7,<4       # tested: 3.11
 
-# Progress bars
-tqdm>=4.64
-
-# YOLOv8 object detection (optional, used by the detection cropping step).
-# Install separately if you want the detection stage:
-#   pip install ultralytics
-# ultralytics>=8.0
-
-# OpenCV for image preprocessing (optional)
-#   pip install opencv-python-headless
-# opencv-python-headless>=4.7
+# --- Optional extras (not required for the core train/eval/predict pipeline) ---
+# YOLOv8 detect-and-crop stage (src/detect.py):
+#   pip install "ultralytics>=8.0,<9"
+# OpenCV image preprocessing:
+#   pip install "opencv-python-headless>=4.7,<5"

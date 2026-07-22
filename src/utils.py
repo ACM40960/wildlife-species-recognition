@@ -20,6 +20,55 @@ def set_seed(seed: int) -> None:
         pass
 
 
+def enable_determinism() -> None:
+    """Ask PyTorch for deterministic algorithms where it can provide them.
+
+    ``warn_only=True`` means ops without a deterministic implementation warn
+    rather than crash, so training still runs while being as reproducible as the
+    backend allows. Also disables cuDNN autotuning (a source of run-to-run
+    variation) and sets the cuBLAS workspace required for determinism on CUDA.
+    """
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    try:
+        import torch
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True, warn_only=True)
+    except Exception:
+        pass
+
+
+def environment_info() -> dict:
+    """Record versions needed to reproduce a run (issue: reproducibility)."""
+    import platform
+
+    info = {
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+    }
+    try:
+        import torch
+        info["torch"] = torch.__version__
+        info["cuda_available"] = torch.cuda.is_available()
+        info["cuda"] = getattr(torch.version, "cuda", None)
+        if torch.cuda.is_available():
+            info["gpu"] = torch.cuda.get_device_name(0)
+    except Exception:
+        info["torch"] = None
+    try:
+        import torchvision
+        info["torchvision"] = torchvision.__version__
+    except Exception:
+        info["torchvision"] = None
+    try:
+        info["numpy"] = np.__version__
+        import sklearn
+        info["scikit_learn"] = sklearn.__version__
+    except Exception:
+        pass
+    return info
+
+
 def ensure_dir(path: str) -> str:
     os.makedirs(path, exist_ok=True)
     return path
