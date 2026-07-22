@@ -118,22 +118,41 @@ not only the training-curve plot.
 
 ## 5. Evaluation
 
-`src/evaluate.py` scores the best checkpoint on the location-held-out test split
-and writes:
+`src/evaluate.py` first **validates the checkpoint** against the current dataset —
+the class names must match exactly (same order) and the backbone, image size and
+grayscale setting must match what the checkpoint was trained with; a mismatch
+raises rather than silently reporting nonsense. It then scores the checkpoint and
+writes:
 
-- **Metrics** (`metrics.json`): accuracy; precision, recall, and F1 both
-  **macro-averaged** (each species weighted equally) and **weighted** (by
-  support); plus a full per-class report and the split strategy used.
-- **Confusion matrix** (`confusion_matrix.png`), row-normalised.
+- **Metrics** (`metrics.json`), all with 95% confidence intervals because the
+  test set is small (~30/species):
+  - accuracy with a **Wilson** interval;
+  - **balanced accuracy** and macro precision/recall/F1, with a **bootstrap**
+    interval on macro-F1;
+  - **top-2 / top-3** accuracy;
+  - **expected calibration error** (are the confidences trustworthy?);
+  - a per-class report with a Wilson interval on each species' recall.
+- **Seen vs. unseen locations.** A fixed, deterministic fraction of the
+  training-location images is held out of training (`seen_test_fraction`) and
+  scored separately, so the report shows accuracy on **seen** camera sites next to
+  the honest **unseen** number — the gap is the generalisation cost.
+- **Confusion matrix** (`confusion_matrix.png`) and an **error-analysis montage**
+  (`error_analysis.png`) of the most-confident correct predictions and the
+  most-confident mistakes, to inspect whether errors come from darkness,
+  occlusion, cropping or similar species.
 
-Macro and weighted averages are both reported because the macro number is the
-honest one when class support is uneven — it does not let common species mask
-poor performance on rare ones.
+Macro averages are emphasised because they don't let common species mask poor
+performance on rare ones. We deliberately do **not** plot our accuracy against the
+Norouzzadeh (2018) or Schneider (2020) numbers — different datasets, species and
+protocols make that comparison invalid; they appear in the literature review as
+context only.
 
-We deliberately do **not** plot our accuracy against the Norouzzadeh (2018) or
-Schneider (2020) numbers. Those studies used different datasets, species, and
-evaluation protocols, so a side-by-side bar chart would imply a comparison that
-isn't valid. They appear in the literature review as context only.
+**Detected-animal vs. full-frame.** Because the crop is applied at load time
+(`crop_to_bbox`), the same split can be trained and evaluated with the animal
+cropped or on the full frame just by toggling `--crop-to-bbox` / `--no-crop-to-bbox`.
+Cropping to the animal (using the dataset bounding boxes as the detector) improves
+unseen-location accuracy from 0.46 to 0.55 and roughly halves the calibration
+error, so detection is a genuine part of the pipeline, not an afterthought.
 
 ## 6. Optional detection stage
 

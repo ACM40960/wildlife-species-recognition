@@ -22,23 +22,26 @@ smoothing 0.05; seed 42. "Split" = how train/val/test is partitioned.
 | 2026-07-21 | v2 · pretrained, freeze `layer2` | stratified | 0.733 | 0.729 | v2 same-location. Superseded. |
 | 2026-07-21 | v3 (pre model-fix) · freeze `layer2` | location-held-out | 0.506 | 0.505 | Before the frozen-BatchNorm fix. Superseded. |
 | 2026-07-21 | v3 (pre model-fix) · freeze `layer2` | stratified | 0.611 | 0.608 | Superseded. |
+| 2026-07-21 | v3 + model fixes · freeze `layer2` | location-held-out | 0.554 | 0.552 | Before the seen-location holdout was carved. |
 | — | — | — | — | — | — |
-| 2026-07-21 | **v3 + model fixes · freeze `layer2`, 16 ep** | **location-held-out** | **0.554** | 0.552 | **Current headline.** Frozen-BN kept in eval, deterministic run. |
-| 2026-07-21 | v3 + model fixes · freeze `layer2`, 16 ep | stratified (same-location) | 0.639 | 0.636 | Same data, random split. |
+| 2026-07-21 | **v3 · crop=detected · 16 ep** | **location · unseen** | **0.549** | 0.548 | **Current headline.** 95% CI 0.485–0.612; top-2 0.68; ECE 0.14. |
+| 2026-07-21 | v3 · crop=detected · 16 ep | location · **seen** | 0.755 | — | Same model, seen-location holdout. Seen−unseen gap **+0.21**. |
+| 2026-07-21 | v3 · crop=**full frame** · 16 ep | location · unseen | 0.459 | 0.455 | Full-frame input. Detected-animal beats it by ~0.09; ECE 0.22. |
 
-Key result: with the animal cropped at load time and frozen BatchNorm kept in
-eval, the same-location advantage is only **0.64 vs 0.55** (gap ~0.09). Cropping
-to the animal removed most of the background the model was exploiting, so it both
-generalises better to new sites and leaks little from same-location backgrounds.
-(Keeping frozen BatchNorm in eval — issue 14 — lifted the held-out number from
-0.506 to 0.554.) Each run now also writes `history.csv`/`history.json` and
-`environment.json` for reproducibility.
+Key results:
+
+- **Seen vs. unseen** (one model): 0.76 on seen camera sites vs **0.55** on unseen
+  sites — a +0.21 generalisation gap that persists even with the animal cropped.
+- **Detected animal vs. full frame** (same split): cropping to the bounding box
+  lifts unseen accuracy 0.46 → **0.55** and roughly halves calibration error.
+- Every run writes `history.csv`/`history.json`, `environment.json`, and
+  `error_analysis.png`; metrics carry 95% confidence intervals (test set is small).
 
 ## Planned runs
 
 - Linear probe (`--freeze-until all`) — how much do the frozen ImageNet features
   alone get us on the location-held-out split?
-- YOLOv8 detect-and-crop vs. manifest-bbox vs. full frame (Issue #2).
+- Wire a YOLO detector to supply boxes for the ~50% of frames without one (Issue #2).
 - More images/species and more species, to test whether 0.55 improves with scale.
 
 ## How to reproduce a row

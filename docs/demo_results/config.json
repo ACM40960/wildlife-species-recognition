@@ -6,6 +6,7 @@
   "split_by": "location",
   "manifest_name": "manifest.csv",
   "crop_to_bbox": true,
+  "seen_test_fraction": 0.15,
   "grayscale_to_rgb": true,
   "num_workers": 2,
   "backbone": "resnet18",

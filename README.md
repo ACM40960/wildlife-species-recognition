@@ -99,33 +99,59 @@ Everything (checkpoint, `metrics.json`, and the plots) is written to
 
 ## Results
 
-Trained on the 1,200 infrared images above, 16 epochs on CPU. The headline
-number is the **location-held-out** split, where whole camera sites are kept out
-of training so the model cannot lean on backgrounds it has already seen.
+Trained on the 1,200 infrared images above, 16 epochs on CPU. The test set is
+small (233 images), so every number is reported with a 95% confidence interval.
 
-| Split | What it measures | Test acc | Macro F1 |
-|-------|------------------|----------|----------|
-| **Location-held-out** | generalisation to **new camera sites** (the honest number) | **0.55** | 0.55 |
-| Same-location (stratified) | shares backgrounds with training | 0.64 | 0.64 |
+**Seen vs. unseen camera locations** (same model, evaluated on both):
 
-Random guessing with 6 classes is 0.17. Because the model is trained on the
-animal crop rather than the whole frame, the same-location advantage is small
-(0.64 vs **0.55**) — i.e. the score reflects the animal, not the background. The
-location-held-out **0.55** is the number to trust.
+| Locations | What it measures | Accuracy (95% CI) |
+|-----------|------------------|-------------------|
+| **Unseen** (held-out sites) | generalisation to **new cameras** — the honest number | **0.55** (0.49–0.61) |
+| Seen (held-out images from training sites) | performance on familiar backgrounds | 0.76 |
 
-Per-species, location-held-out split (test = 233 images):
+The **+0.21** gap between seen and unseen locations is the key result: even with
+the animal cropped out of the frame, a model still does noticeably better on
+cameras it has seen. Random guessing with 6 classes is 0.17.
 
-| Species  | Precision | Recall | F1   | Test images |
-|----------|-----------|--------|------|-------------|
-| deer     | 0.81      | 0.72   | 0.76 | 36 |
-| rabbit   | 0.57      | 0.69   | 0.62 | 51 |
-| opossum  | 0.72      | 0.53   | 0.61 | 34 |
-| bobcat   | 0.42      | 0.56   | 0.48 | 41 |
-| raccoon  | 0.61      | 0.33   | 0.43 | 33 |
-| coyote   | 0.38      | 0.42   | 0.40 | 38 |
+Other metrics on the unseen-location test set:
+
+| Metric | Value |
+|--------|-------|
+| Balanced accuracy | 0.55 |
+| Macro-F1 (95% CI) | 0.55 (0.48–0.61) |
+| Top-2 / Top-3 accuracy | 0.68 / 0.78 |
+| Expected calibration error | 0.14 |
+
+**Detected-animal vs. full-frame** (issue: does cropping to the animal help?),
+same location split:
+
+| Input | Unseen acc | ECE |
+|-------|-----------|-----|
+| **Detected animal** (crop to bounding box) | **0.55** | 0.14 |
+| Full frame | 0.46 | 0.22 |
+
+Cropping to the animal lifts unseen-location accuracy by ~9 points and improves
+calibration — evidence the classifier does better when it isn't shown the
+background.
+
+Per-species, unseen-location test (with 95% CI on recall):
+
+| Species  | Precision | Recall | F1   | Recall 95% CI | Test images |
+|----------|-----------|--------|------|---------------|-------------|
+| deer     | 0.65      | 0.78   | 0.71 | 0.62–0.88 | 36 |
+| rabbit   | 0.73      | 0.59   | 0.65 | 0.45–0.71 | 51 |
+| opossum  | 0.67      | 0.47   | 0.55 | 0.31–0.63 | 34 |
+| raccoon  | 0.50      | 0.48   | 0.49 | 0.33–0.65 | 33 |
+| bobcat   | 0.42      | 0.49   | 0.45 | 0.34–0.64 | 41 |
+| coyote   | 0.40      | 0.47   | 0.43 | 0.32–0.63 | 38 |
 
 ![training curves](docs/demo_results/training_curves.png)
 ![confusion matrix](docs/demo_results/confusion_matrix.png)
+![error analysis](docs/demo_results/error_analysis.png)
+
+`scripts/run_evaluation.py` writes all of the above to `metrics.json` plus the
+confusion matrix and an `error_analysis.png` montage of the most-confident correct
+predictions and errors.
 
 ## Known limitations
 
@@ -133,8 +159,8 @@ Per-species, location-held-out split (test = 233 images):
   behaviour on rare species and at larger scale is untested.
 - Bounding boxes cover ~50% of the frames; the rest are classified from the whole
   (letterboxed) frame, so some test images still include background.
-- The YOLOv8 detection stage in `src/detect.py` is optional and **not yet part of
-  the reported results** (see
+- The detected-animal result uses the dataset's ground-truth boxes. Wiring a YOLO
+  detector to supply boxes for the frames that lack them is the next step (see
   [Issue #2](https://github.com/srivanik8/final-project/issues/2)).
 
 ## Making the dataset bigger
