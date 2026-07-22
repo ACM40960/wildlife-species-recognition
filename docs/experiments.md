@@ -27,6 +27,7 @@ smoothing 0.05; seed 42. "Split" = how train/val/test is partitioned.
 | 2026-07-21 | **v3 · crop=detected · 16 ep** | **location · unseen** | **0.549** | 0.548 | **Current headline.** 95% CI 0.485–0.612; top-2 0.68; ECE 0.14. |
 | 2026-07-21 | v3 · crop=detected · 16 ep | location · **seen** | 0.755 | — | Same model, seen-location holdout. Seen−unseen gap **+0.21**. |
 | 2026-07-21 | v3 · crop=**full frame** · 16 ep | location · unseen | 0.459 | 0.455 | Full-frame input. Detected-animal beats it by ~0.09; ECE 0.22. |
+| 2026-07-21 | v3 · crop=detected + **YOLO-filled boxes** (66%) | location · unseen | 0.545 | 0.542 | YOLO raised box coverage 50%→66%; accuracy unchanged within CI. |
 
 Key results:
 

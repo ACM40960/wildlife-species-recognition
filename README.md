@@ -39,10 +39,15 @@ A ready-made subset is included in the repo at
   (`build_report.txt`) and wipes the output directory first so a re-run can't
   leave stale files.
 
+**Bounding boxes.** ~50% of frames carry a ground-truth box from CCT; a
+COCO-pretrained **YOLOv8** detector (`scripts/fill_boxes_yolo.py`) fills in boxes
+for frames that lack one, raising coverage to **66%** (598 ground-truth + 200
+YOLO). Each row's `box_source` column records `gt` / `yolo` / `none`.
+
 Every image is recorded in
 [`data/night_wildlife/manifest.csv`](data/night_wildlife/manifest.csv) with its
 source id, original filename, class, camera location, sequence id, timestamp,
-month/season, bounding box, split, and SHA-256 checksum.
+month/season, bounding box, `box_source`, split, and SHA-256 checksum.
 `python scripts/validate_dataset.py` checks class balance, file integrity,
 split/location overlap, and manifest↔file consistency before training.
 
@@ -125,25 +130,27 @@ Other metrics on the unseen-location test set:
 **Detected-animal vs. full-frame** (issue: does cropping to the animal help?),
 same location split:
 
-| Input | Unseen acc | ECE |
-|-------|-----------|-----|
-| **Detected animal** (crop to bounding box) | **0.55** | 0.14 |
-| Full frame | 0.46 | 0.22 |
+| Input | Box coverage | Unseen acc | ECE |
+|-------|-------------|-----------|-----|
+| **Detected animal** (crop to box) | 66% (GT + YOLO) | **0.55** | 0.15 |
+| Full frame | — | 0.46 | 0.22 |
 
 Cropping to the animal lifts unseen-location accuracy by ~9 points and improves
 calibration — evidence the classifier does better when it isn't shown the
-background.
+background. Adding the YOLO-detected boxes (raising coverage from 50% to 66%) left
+accuracy unchanged within the confidence interval (0.55 → 0.545): the imperfect
+detector boxes on infrared frames add coverage but little extra signal.
 
 Per-species, unseen-location test (with 95% CI on recall):
 
 | Species  | Precision | Recall | F1   | Recall 95% CI | Test images |
 |----------|-----------|--------|------|---------------|-------------|
-| deer     | 0.65      | 0.78   | 0.71 | 0.62–0.88 | 36 |
-| rabbit   | 0.73      | 0.59   | 0.65 | 0.45–0.71 | 51 |
-| opossum  | 0.67      | 0.47   | 0.55 | 0.31–0.63 | 34 |
-| raccoon  | 0.50      | 0.48   | 0.49 | 0.33–0.65 | 33 |
-| bobcat   | 0.42      | 0.49   | 0.45 | 0.34–0.64 | 41 |
-| coyote   | 0.40      | 0.47   | 0.43 | 0.32–0.63 | 38 |
+| rabbit   | 0.62      | 0.69   | 0.65 | 0.55–0.80 | 51 |
+| deer     | 0.65      | 0.61   | 0.63 | 0.45–0.75 | 36 |
+| opossum  | 0.68      | 0.50   | 0.58 | 0.34–0.66 | 34 |
+| raccoon  | 0.50      | 0.52   | 0.51 | 0.35–0.67 | 33 |
+| coyote   | 0.42      | 0.50   | 0.46 | 0.35–0.65 | 38 |
+| bobcat   | 0.44      | 0.41   | 0.42 | 0.28–0.57 | 41 |
 
 ![training curves](docs/demo_results/training_curves.png)
 ![confusion matrix](docs/demo_results/confusion_matrix.png)
@@ -157,11 +164,11 @@ predictions and errors.
 
 - The 0.55 is from a **small** dataset (200 images/species) with only six species;
   behaviour on rare species and at larger scale is untested.
-- Bounding boxes cover ~50% of the frames; the rest are classified from the whole
-  (letterboxed) frame, so some test images still include background.
-- The detected-animal result uses the dataset's ground-truth boxes. Wiring a YOLO
-  detector to supply boxes for the frames that lack them is the next step (see
-  [Issue #2](https://github.com/srivanik8/final-project/issues/2)).
+- Bounding boxes cover 66% of the frames (ground-truth + YOLO); the remaining 34%
+  are classified from the whole (letterboxed) frame, so some test images still
+  include background.
+- The YOLO detector is COCO-pretrained, so its infrared boxes are imperfect;
+  fine-tuning a detector on camera-trap boxes could raise coverage and quality.
 
 ## Making the dataset bigger
 

@@ -154,12 +154,23 @@ Cropping to the animal (using the dataset bounding boxes as the detector) improv
 unseen-location accuracy from 0.46 to 0.55 and roughly halves the calibration
 error, so detection is a genuine part of the pipeline, not an afterthought.
 
-## 6. Optional detection stage
+## 6. Detection stage (YOLOv8)
 
-`src/detect.py` wraps YOLOv8 to localise the animal and crop to it before
-classification, removing background. It is optional (needs `ultralytics`),
-degrades gracefully to the full frame when nothing is detected, and is **not yet
-part of the reported results** (Issue #2).
+`src/detect.py` wraps a COCO-pretrained YOLOv8n detector. About half of the CCT
+frames have a ground-truth bounding box; `scripts/fill_boxes_yolo.py` runs the
+detector over the frames that don't and writes the detected box into the manifest
+(`box_source = gt | yolo | none`), raising box coverage from 50% to **66%**. The
+detector runs on the already-stored frames, so no re-download is needed, and the
+box is used by the same load-time `crop_to_bbox` path as the ground-truth boxes.
+`scripts/fetch_yolo_weights.py` fetches the weights from a checksum-verified
+mirror for offline environments.
+
+The detector's *class* prediction is ignored — an infrared deer may be called
+"cow"; only the box is used, to crop to the animal. Filling boxes to 66% coverage
+left held-out accuracy unchanged within the confidence interval (0.55 → 0.545),
+so the extra YOLO boxes add coverage but little classification signal on this
+infrared data; fine-tuning a detector on camera-trap boxes is the natural next
+step.
 
 ## References
 
