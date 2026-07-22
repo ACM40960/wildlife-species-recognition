@@ -29,10 +29,43 @@ def yolo_available() -> bool:
         return False
 
 
-def load_detector(weights: str = "yolov8n.pt"):
-    """Load a YOLOv8 model (downloads weights on first use)."""
+# Default location the offline fetcher writes to (scripts/fetch_yolo_weights.py).
+DEFAULT_WEIGHTS = ".cct_cache/yolov8n.pt"
+
+
+def load_detector(weights: str = None):
+    """Load a YOLOv8 model.
+
+    Prefers the checksum-verified local weights fetched by
+    ``scripts/fetch_yolo_weights.py``; otherwise falls back to ultralytics'
+    automatic download (needs internet).
+    """
+    import os
     from ultralytics import YOLO
+
+    if weights is None:
+        weights = DEFAULT_WEIGHTS if os.path.exists(DEFAULT_WEIGHTS) else "yolov8n.pt"
     return YOLO(weights)
+
+
+def best_animal_box(model, image, conf: float = 0.2):
+    """Return the highest-confidence animal box as (x, y, w, h) in pixel coords,
+    or None if no animal is detected. ``image`` is a path or PIL image.
+
+    Only COCO animal categories are considered; the *class* YOLO assigns is
+    irrelevant here (a deer may be called "cow") — we only want the box to crop to.
+    """
+    results = model(image, conf=conf, verbose=False)
+    best, best_conf = None, -1.0
+    for r in results:
+        if r.boxes is None:
+            continue
+        for box in r.boxes:
+            if int(box.cls.item()) in _COCO_ANIMAL_IDS and float(box.conf.item()) > best_conf:
+                best_conf = float(box.conf.item())
+                x1, y1, x2, y2 = box.xyxy.squeeze().tolist()
+                best = (int(x1), int(y1), int(x2 - x1), int(y2 - y1))
+    return best
 
 
 def detect_and_crop(model, image_path: str, conf: float = 0.25,

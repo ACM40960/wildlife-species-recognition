@@ -280,6 +280,7 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
     print(f"[split] {dict(per_split)}")
     print(f"[rejects] {len(rejects)} ({dict(reason_counts)}) -> {report_path}")
     print(f"[manifest] {manifest_path}")
+    return manifest_path
 
 
 if __name__ == "__main__":
@@ -296,7 +297,13 @@ if __name__ == "__main__":
     ap.add_argument("--val-fraction", type=float, default=0.15)
     ap.add_argument("--test-fraction", type=float, default=0.15)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--fill-boxes-yolo", action="store_true",
+                    help="after building, run YOLOv8 to add boxes to frames that "
+                         "lack a ground-truth one (raises crop coverage)")
     args = ap.parse_args()
     build(args.out, args.species, args.per_class, args.per_location_cap,
           args.store_size, args.cache_dir, args.workers,
           args.val_fraction, args.test_fraction, args.seed)
+    if args.fill_boxes_yolo:
+        from fill_boxes_yolo import fill_manifest_boxes
+        fill_manifest_boxes(args.out)
