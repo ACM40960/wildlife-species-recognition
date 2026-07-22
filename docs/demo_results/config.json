@@ -18,6 +18,7 @@
   "label_smoothing": 0.05,
   "early_stop_patience": 5,
   "seed": 42,
+  "deterministic": true,
   "device": "cpu",
   "output_dir": "results/demo",
   "checkpoint_name": "best_model.pt",

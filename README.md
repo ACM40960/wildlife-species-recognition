@@ -105,31 +105,31 @@ of training so the model cannot lean on backgrounds it has already seen.
 
 | Split | What it measures | Test acc | Macro F1 |
 |-------|------------------|----------|----------|
-| **Location-held-out** | generalisation to **new camera sites** (the honest number) | **0.51** | 0.51 |
-| Same-location (stratified) | shares backgrounds with training | 0.61 | 0.61 |
+| **Location-held-out** | generalisation to **new camera sites** (the honest number) | **0.55** | 0.55 |
+| Same-location (stratified) | shares backgrounds with training | 0.64 | 0.64 |
 
 Random guessing with 6 classes is 0.17. Because the model is trained on the
 animal crop rather than the whole frame, the same-location advantage is small
-(0.61 vs **0.51**) — i.e. the score reflects the animal, not the background. The
-location-held-out **0.51** is the number to trust.
+(0.64 vs **0.55**) — i.e. the score reflects the animal, not the background. The
+location-held-out **0.55** is the number to trust.
 
 Per-species, location-held-out split (test = 233 images):
 
 | Species  | Precision | Recall | F1   | Test images |
 |----------|-----------|--------|------|-------------|
-| deer     | 0.66      | 0.69   | 0.68 | 36 |
-| rabbit   | 0.70      | 0.63   | 0.66 | 51 |
-| opossum  | 0.75      | 0.44   | 0.56 | 34 |
-| bobcat   | 0.32      | 0.56   | 0.41 | 41 |
-| raccoon  | 0.52      | 0.33   | 0.41 | 33 |
-| coyote   | 0.33      | 0.32   | 0.32 | 38 |
+| deer     | 0.81      | 0.72   | 0.76 | 36 |
+| rabbit   | 0.57      | 0.69   | 0.62 | 51 |
+| opossum  | 0.72      | 0.53   | 0.61 | 34 |
+| bobcat   | 0.42      | 0.56   | 0.48 | 41 |
+| raccoon  | 0.61      | 0.33   | 0.43 | 33 |
+| coyote   | 0.38      | 0.42   | 0.40 | 38 |
 
 ![training curves](docs/demo_results/training_curves.png)
 ![confusion matrix](docs/demo_results/confusion_matrix.png)
 
 ## Known limitations
 
-- The 0.51 is from a **small** dataset (200 images/species) with only six species;
+- The 0.55 is from a **small** dataset (200 images/species) with only six species;
   behaviour on rare species and at larger scale is untested.
 - Bounding boxes cover ~50% of the frames; the rest are classified from the whole
   (letterboxed) frame, so some test images still include background.

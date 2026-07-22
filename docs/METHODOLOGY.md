@@ -79,10 +79,14 @@ Transfer learning from an ImageNet-pretrained **ResNet-18** (`src/model.py`):
   the number of species.
 - Early residual blocks are **frozen** and the later blocks are **retrained**.
   The freeze point is controlled by `--freeze-until` (block order: `conv1`,
-  `bn1`, `layer1`, `layer2`, `layer3`, `layer4`). The reported run uses
-  `--freeze-until layer2`, i.e. `conv1`/`bn1`/`layer1`/`layer2` are frozen and
-  `layer3`/`layer4`/head are trained. `""` trains the whole network; `all` freezes
-  the backbone entirely (a linear probe on frozen features).
+  `bn1`, `layer1`, `layer2`, `layer3`, `layer4`); the **default is `layer2`**, so
+  `conv1`/`bn1`/`layer1`/`layer2` are frozen and `layer3`/`layer4`/head are
+  trained (~10.5M of 11.2M params). `""` trains the whole network; `all` (or
+  `layer4`) freezes the backbone entirely (head-only / linear probe).
+- **Frozen BatchNorm is kept in eval mode** during training. A frozen BN layer
+  otherwise keeps updating its running mean/variance under `net.train()`, quietly
+  changing a "frozen" layer; pinning it to eval keeps the ImageNet statistics.
+  This alone lifted the held-out accuracy from 0.51 to 0.55.
 
 The rationale (Tabak et al., 2019): early convolutional filters — edges and
 textures — transfer well across domains, while the deeper, task-specific layers
@@ -101,11 +105,16 @@ benefit from adapting to camera-trap imagery.
   5 epochs (`--early-stop-patience`).
 - **Checkpointing:** the best model by validation accuracy is saved to
   `results/<name>/best_model.pt`, together with the class names and the exact
-  `Config`.
+  `Config`. The best-so-far accuracy starts below zero, so a checkpoint is written
+  even if the first epoch's validation accuracy is 0.
 
-Everything is seeded (`--seed`, default 42) for reproducibility, and the config
-is written to `config.json` next to the checkpoint so evaluation reproduces the
-same split and preprocessing.
+**Reproducibility.** Every run is seeded (`--seed`, default 42) and, unless
+`deterministic` is turned off, PyTorch is asked for deterministic algorithms
+(`torch.use_deterministic_algorithms(warn_only=True)`, cuDNN autotuning off).
+Each run writes: `config.json` (exact settings), `environment.json` (Python,
+PyTorch, Torchvision, CUDA and OS versions), and the full per-epoch history as
+both `history.json` and `history.csv` (loss, accuracy, learning rate, timing) —
+not only the training-curve plot.
 
 ## 5. Evaluation
 

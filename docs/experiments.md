@@ -20,21 +20,26 @@ smoothing 0.05; seed 42. "Split" = how train/val/test is partitioned.
 | 2026-07-21 | v1 · from scratch | stratified | 0.622 | 0.617 | v1 ablation (transfer learning +0.15). Superseded. |
 | 2026-07-21 | v2 · pretrained, freeze `layer2` | location-held-out | 0.368 | 0.351 | v2. Superseded by v3. |
 | 2026-07-21 | v2 · pretrained, freeze `layer2` | stratified | 0.733 | 0.729 | v2 same-location. Superseded. |
+| 2026-07-21 | v3 (pre model-fix) · freeze `layer2` | location-held-out | 0.506 | 0.505 | Before the frozen-BatchNorm fix. Superseded. |
+| 2026-07-21 | v3 (pre model-fix) · freeze `layer2` | stratified | 0.611 | 0.608 | Superseded. |
 | — | — | — | — | — | — |
-| 2026-07-21 | **v3 · pretrained, freeze `layer2`, 16 ep** | **location-held-out** | **0.506** | 0.505 | **Current headline.** Honest generalisation to unseen sites. |
-| 2026-07-21 | v3 · pretrained, freeze `layer2`, 16 ep | stratified (same-location) | 0.611 | 0.608 | Same data, random split. |
+| 2026-07-21 | **v3 + model fixes · freeze `layer2`, 16 ep** | **location-held-out** | **0.554** | 0.552 | **Current headline.** Frozen-BN kept in eval, deterministic run. |
+| 2026-07-21 | v3 + model fixes · freeze `layer2`, 16 ep | stratified (same-location) | 0.639 | 0.636 | Same data, random split. |
 
-Key v3 result: with the animal cropped at load time, the same-location advantage
-is only **0.61 vs 0.51** (gap 0.10, down from v2's 0.36). Cropping to the animal
-removed most of the background the model was exploiting, so it both generalises
-better to new sites (0.37 → **0.51**) and leaks less from same-location backgrounds.
+Key result: with the animal cropped at load time and frozen BatchNorm kept in
+eval, the same-location advantage is only **0.64 vs 0.55** (gap ~0.09). Cropping
+to the animal removed most of the background the model was exploiting, so it both
+generalises better to new sites and leaks little from same-location backgrounds.
+(Keeping frozen BatchNorm in eval — issue 14 — lifted the held-out number from
+0.506 to 0.554.) Each run now also writes `history.csv`/`history.json` and
+`environment.json` for reproducibility.
 
 ## Planned runs
 
 - Linear probe (`--freeze-until all`) — how much do the frozen ImageNet features
   alone get us on the location-held-out split?
 - YOLOv8 detect-and-crop vs. manifest-bbox vs. full frame (Issue #2).
-- More images/species and more species, to test whether 0.51 improves with scale.
+- More images/species and more species, to test whether 0.55 improves with scale.
 
 ## How to reproduce a row
 

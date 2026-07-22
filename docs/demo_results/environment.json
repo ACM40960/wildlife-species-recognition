@@ -1,0 +1,10 @@
+{
+  "python": "3.11.15",
+  "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+  "torch": "2.13.0+cu130",
+  "cuda_available": false,
+  "cuda": "13.0",
+  "torchvision": "0.28.0+cu130",
+  "numpy": "2.4.6",
+  "scikit_learn": "1.9.0"
+}
