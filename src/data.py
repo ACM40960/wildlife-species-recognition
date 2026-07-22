@@ -70,8 +70,9 @@ def build_transforms(image_size: int, grayscale_to_rgb: bool, train: bool):
 class Datasets:
     train: object
     val: object
-    test: object
+    test: object                 # unseen-location test (the honest held-out set)
     class_names: List[str]
+    seen_test: object = None     # held-out images from SEEN (training) locations
 
 
 def _stratified_indices(targets: List[int], n_classes: int,
@@ -112,6 +113,33 @@ def _parse_bbox(raw):
         return (x, y, w, h)
     except Exception:
         return None
+
+
+def _carve_seen_test(train_rows, fraction, seed):
+    """Deterministically hold out a fraction of train rows as a seen-location test.
+
+    Assignment is by a stable hash of ``image_id`` (not Python's salted ``hash``),
+    so the same images are held out on every run and across processes. Returns
+    (kept_train_rows, seen_test_rows). Stratified per class so each species is
+    represented in the seen-location test.
+    """
+    import hashlib
+    from collections import defaultdict
+
+    by_class = defaultdict(list)
+    for r in train_rows:
+        by_class[r["class"]].append(r)
+
+    kept, seen = [], []
+    for cls, rows_c in by_class.items():
+        def key(r):
+            h = hashlib.md5(f"{seed}:{r['image_id']}".encode()).hexdigest()
+            return int(h[:8], 16)
+        rows_sorted = sorted(rows_c, key=key)
+        n_seen = int(round(len(rows_sorted) * fraction))
+        seen.extend(rows_sorted[:n_seen])
+        kept.extend(rows_sorted[n_seen:])
+    return kept, seen
 
 
 class ManifestDataset:
@@ -177,6 +205,15 @@ def load_datasets(cfg) -> Datasets:
         for r in rows:
             if r.get("split") in by_split:
                 by_split[r["split"]].append(r)
+
+        # Carve a SEEN-location test set: hold out a fraction of the train-location
+        # images (deterministically, so they are never trained on) to measure
+        # accuracy on locations the model HAS seen, alongside the unseen test set.
+        seen_frac = getattr(cfg, "seen_test_fraction", 0.0)
+        seen_rows = []
+        if seen_frac > 0:
+            keep, seen_rows = _carve_seen_test(by_split["train"], seen_frac, cfg.seed)
+            by_split["train"] = keep
         crop = getattr(cfg, "crop_to_bbox", True)
 
         def ds(split_rows, tf):
@@ -187,6 +224,7 @@ def load_datasets(cfg) -> Datasets:
             val=ds(by_split["val"], eval_tf),
             test=ds(by_split["test"], eval_tf),
             class_names=class_names,
+            seen_test=ds(seen_rows, eval_tf) if seen_rows else None,
         )
 
     # Fallback: stratified random split over a plain ImageFolder.

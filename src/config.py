@@ -23,6 +23,9 @@ class Config:
     manifest_name: str = "manifest.csv"
     crop_to_bbox: bool = True              # crop to the animal box at load time
                                            # (frames are stored uncropped)
+    seen_test_fraction: float = 0.15       # of train-location images, held out
+                                           # (not trained) to measure accuracy on
+                                           # SEEN locations vs the unseen test set
     grayscale_to_rgb: bool = True          # IR frames are 1-channel; repeat to 3
     num_workers: int = 2
 

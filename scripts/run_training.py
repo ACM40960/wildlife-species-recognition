@@ -43,6 +43,10 @@ def build_config() -> Config:
                     choices=["location", "stratified"],
                     help="location = held-out camera sites (manifest); "
                          "stratified = random per class (same-location)")
+    ap.add_argument("--crop-to-bbox", dest="crop_to_bbox", action="store_true", default=None,
+                    help="crop to the detected animal box (default)")
+    ap.add_argument("--no-crop-to-bbox", dest="crop_to_bbox", action="store_false",
+                    help="use the full frame (for the full-vs-detected comparison)")
     ap.add_argument("--output-dir", default=None)
     ap.add_argument("--device", default=None, choices=["auto", "cpu", "cuda"])
     ap.add_argument("--seed", type=int, default=None)
@@ -51,7 +55,7 @@ def build_config() -> Config:
     cfg = Config()
     for key in ("data_dir", "backbone", "epochs", "batch_size", "learning_rate",
                 "image_size", "freeze_until", "pretrained", "grayscale_to_rgb",
-                "split_by", "output_dir", "device", "seed"):
+                "split_by", "crop_to_bbox", "output_dir", "device", "seed"):
         val = getattr(args, key, None)
         if val is not None:
             setattr(cfg, key, val)
