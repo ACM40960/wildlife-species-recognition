@@ -32,6 +32,9 @@ def location_grouped_split(records: List[dict], val_fraction: float,
     class_total = Counter(r["class"] for r in records)
     test_target = {c: test_fraction * n for c, n in class_total.items()}
     val_target = {c: val_fraction * n for c, n in class_total.items()}
+    total = sum(class_total.values())
+    test_total_target = test_fraction * total
+    val_total_target = val_fraction * total
 
     loc_classes: Dict[str, Counter] = defaultdict(Counter)
     for r in records:
@@ -46,12 +49,23 @@ def location_grouped_split(records: List[dict], val_fraction: float,
 
     for loc in locations:
         classes_here = loc_classes[loc]
-        needs_test = any(test_count[c] < test_target[c] for c in classes_here)
-        needs_val = any(val_count[c] < val_target[c] for c in classes_here)
-        if needs_test:
+        # A location is sent to a split if some class there is still under its
+        # per-class target AND either the split has overall room left OR the
+        # location introduces a class that split doesn't have yet. The
+        # total-room cap stops a single big location from massively overshooting
+        # the target fraction, while the "missing class" clause guarantees every
+        # class still reaches every split (so coverage is preserved).
+        test_under = any(test_count[c] < test_target[c] for c in classes_here)
+        test_room = sum(test_count.values()) < test_total_target
+        test_missing = any(test_count[c] == 0 for c in classes_here)
+        val_under = any(val_count[c] < val_target[c] for c in classes_here)
+        val_room = sum(val_count.values()) < val_total_target
+        val_missing = any(val_count[c] == 0 for c in classes_here)
+
+        if test_under and (test_room or test_missing):
             assignment[loc] = "test"
             test_count.update(classes_here)
-        elif needs_val:
+        elif val_under and (val_room or val_missing):
             assignment[loc] = "val"
             val_count.update(classes_here)
         else:

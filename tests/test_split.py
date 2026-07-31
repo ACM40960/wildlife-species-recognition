@@ -47,6 +47,27 @@ def test_every_class_can_reach_test():
     assert "test" in assignment.values()
 
 
+def test_split_sizes_do_not_massively_overshoot():
+    # Many one-class locations: the greedy must not blow past the test fraction.
+    recs = []
+    for loc in range(30):
+        cls = ["a", "b", "c"][loc % 3]
+        for i in range(10):
+            recs.append({"class": cls, "location": str(loc),
+                         "image_id": f"{loc}-{i}"})
+    assignment = location_grouped_split(recs, 0.15, 0.15, seed=0)
+    n = len(recs)
+    n_test = sum(1 for r in recs if assignment[r["location"]] == "test")
+    n_val = sum(1 for r in recs if assignment[r["location"]] == "val")
+    # target 15% each; allow slack for whole-location granularity, but not 2x.
+    assert n_test / n < 0.30
+    assert n_val / n < 0.30
+    # every class still present in test and val
+    for split in ("test", "val", "train"):
+        classes = {r["class"] for r in recs if assignment[r["location"]] == split}
+        assert classes == {"a", "b", "c"}
+
+
 def test_seen_test_carve_is_deterministic_and_disjoint():
     recs = _records()
     keep1, seen1 = _carve_seen_test(recs, 0.2, seed=3)
