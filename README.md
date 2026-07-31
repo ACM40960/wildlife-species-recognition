@@ -202,7 +202,13 @@ settings — is documented in [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md).
 
 Both authors contributed to the literature review and the write-up.
 
-## Credit
+## Licence and credit
+
+- **Code:** MIT — see [`LICENSE`](LICENSE).
+- **Data & weights:** the committed dataset is a derivative subset of Caltech
+  Camera Traps (CDLA-Permissive), and the pretrained weights carry their own
+  licences. Full details, attribution requirements, and exactly what is
+  redistributed are in [`docs/DATA_LICENSE.md`](docs/DATA_LICENSE.md).
 
 Caltech Camera Traps — Beery, Van Horn & Perona, *Recognition in Terra Incognita*,
 ECCV 2018, via LILA BC (https://lila.science/datasets/caltech-camera-traps).
