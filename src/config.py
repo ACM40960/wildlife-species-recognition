@@ -37,9 +37,9 @@ class Config:
                                            # whole backbone (head-only / probe)
 
     # --- Training ---
-    epochs: int = 15
+    epochs: int = 16                       # matches the reported/methodology setup
     batch_size: int = 32
-    learning_rate: float = 1e-3            # for the newly added / unfrozen params
+    learning_rate: float = 3e-4            # for the newly added / unfrozen params
     weight_decay: float = 1e-4
     label_smoothing: float = 0.05
     early_stop_patience: int = 5           # stop if val acc stalls this many epochs
@@ -68,4 +68,8 @@ class Config:
     @classmethod
     def from_json(cls, path: str) -> "Config":
         with open(path) as fh:
-            return cls(**json.load(fh))
+            data = json.load(fh)
+        # Ignore unknown keys so a config.json written by a newer/older version
+        # (with fields since removed) still loads instead of crashing evaluation.
+        known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
+        return cls(**known)
