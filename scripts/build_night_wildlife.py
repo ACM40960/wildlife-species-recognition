@@ -242,6 +242,8 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
                 "season": _season(int(ts[5:7])) if len(ts) >= 7 else "?",
                 "bbox": ";".join(map(str, box)) if box else "",
                 "has_bbox": box is not None,
+                # gt = ground-truth CCT box; fill_boxes_yolo.py may later set 'yolo'.
+                "box_source": "gt" if box is not None else "none",
                 "checksum": checksum,
             })
             saved += 1
@@ -258,7 +260,8 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
 
     manifest_path = os.path.join(out_dir, "manifest.csv")
     cols = ["split", "class", "filename", "image_id", "orig_filename", "location",
-            "seq_id", "timestamp", "month", "season", "bbox", "has_bbox", "checksum"]
+            "seq_id", "timestamp", "month", "season", "bbox", "has_bbox",
+            "box_source", "checksum"]
     with open(manifest_path, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols)
         w.writeheader()
