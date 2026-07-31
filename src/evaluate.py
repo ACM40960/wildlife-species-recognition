@@ -63,7 +63,10 @@ def expected_calibration_error(confidences, correct, n_bins: int = 10) -> float:
     bins = np.linspace(0, 1, n_bins + 1)
     ece, N = 0.0, len(confidences)
     for i in range(n_bins):
-        m = (confidences > bins[i]) & (confidences <= bins[i + 1])
+        # The first bin is closed on the left so a confidence of exactly 0 is
+        # still counted; every other bin is (lo, hi] to avoid double-counting.
+        above_lo = confidences >= bins[i] if i == 0 else confidences > bins[i]
+        m = above_lo & (confidences <= bins[i + 1])
         if m.sum() > 0:
             ece += m.sum() / N * abs(correct[m].mean() - confidences[m].mean())
     return float(ece)
@@ -209,10 +212,18 @@ def _save_error_examples(dataset, y_true, y_pred, probs, class_names, out_path,
     axes = np.atleast_2d(axes)
     for ax in axes.ravel():
         ax.axis("off")
-    for pos, (kind, i) in enumerate(picks):
-        r, c = divmod(pos, cols)
-        if r >= rows_n:
-            break
+    # Correct examples always fill the top row and errors the bottom row,
+    # tracking the next free column per row. Deriving the cell from a flat index
+    # instead would spill errors into the "correct" row whenever there are fewer
+    # than ``max_each`` correct predictions (e.g. a small or low-accuracy split).
+    next_col = {"correct": 0, "error": 0}
+    row_for = {"correct": 0, "error": 1}
+    for kind, i in picks:
+        r = row_for[kind]
+        c = next_col[kind]
+        if c >= cols:
+            continue
+        next_col[kind] += 1
         ax = axes[r][c]
         ax.imshow(load(i), cmap="gray")
         ax.axis("off")
@@ -221,7 +232,6 @@ def _save_error_examples(dataset, y_true, y_pred, probs, class_names, out_path,
             ax.set_title(f"{t}\n({conf[i]:.2f})", fontsize=8, color="green")
         else:
             ax.set_title(f"true {t}\npred {p} ({conf[i]:.2f})", fontsize=8, color="red")
-    axes[0][0].set_ylabel("most-confident correct")
     fig.suptitle("Top: confident correct predictions   Bottom: confident errors",
                  fontsize=10)
     fig.tight_layout()
