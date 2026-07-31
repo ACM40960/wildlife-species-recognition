@@ -179,12 +179,53 @@ python scripts/build_night_wildlife.py --out data/night_wildlife \
     --per-class 300 --species bobcat coyote raccoon opossum rabbit deer skunk fox
 ```
 
+## Reproducing the reported numbers
+
+**Split protocol (read this before quoting a number).** Results are reported on a
+**location-held-out** split: whole camera sites are assigned to train / val / test,
+so test images come from cameras never seen in training. The **0.55** headline is
+this unseen-location accuracy. A same-location (random) split scores higher (0.64)
+but shares backgrounds with training and is reported only for contrast. **We do
+not claim the model generalises broadly** — it is trained on 6 species and 1,200
+low-resolution frames, and 0.55 is the measured accuracy on *these* unseen
+Caltech Camera Traps sites, not a claim about other datasets, regions, or species.
+
+Exact commands (CPU; seed 42; each writes `metrics.json` + plots):
+
+```bash
+pip install -r requirements.txt
+python scripts/fetch_pretrained_weights.py    # only if download.pytorch.org is blocked
+
+# Headline: detected-animal crop, location-held-out split
+python scripts/run_training.py --data-dir data/night_wildlife --epochs 16 \
+    --image-size 224 --pretrained --grayscale --freeze-until layer2 \
+    --learning-rate 3e-4 --split-by location --crop-to-bbox \
+    --output-dir results/demo --device cpu
+python scripts/run_evaluation.py --output-dir results/demo --device cpu
+
+# Full-frame comparison (same split): add --no-crop-to-bbox, --output-dir results/fullframe
+# Same-location contrast:            add --split-by stratified, --output-dir results/samelocation
+```
+
+Tested dependency versions (ranges in `requirements.txt`; Python 3.11):
+
+| Package | Tested |
+|---------|--------|
+| torch / torchvision | 2.13 / 0.28 |
+| numpy | 2.4 |
+| scikit-learn | 1.9 |
+| matplotlib | 3.11 |
+| Pillow | 12.3 |
+
+Every run also records the exact environment it ran in to `environment.json`.
+
 ## What's in the repo
 
 ```
 src/        config, data loading, location-grouped split, model, training, evaluation, detection
-scripts/    build the dataset, train, evaluate, predict
-docs/       literature review, methodology, experiment log, saved result plots
+scripts/    build/validate the dataset, train, evaluate, predict, detection
+tests/      unit tests + a tiny end-to-end smoke test (run: pytest)
+docs/       literature review, methodology, experiment log, licensing, result plots
 data/       the ready-made infrared dataset + manifest.csv
 ```
 
