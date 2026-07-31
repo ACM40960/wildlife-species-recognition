@@ -247,8 +247,9 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
             saved += 1
         n_loc = len({r["location"] for r in saved_records if r["class"] == species})
         n_month = len({r["month"] for r in saved_records if r["class"] == species})
+        n_box = sum(1 for r in saved_records if r["class"] == species and r["has_bbox"])
         print(f"  {species:10s} {saved} images | {n_loc} locations | {n_month} months "
-              f"| {sum(1 for r in saved_records if r['class']==species and r['has_bbox'])} with bbox")
+              f"| {n_box} with bbox")
 
     # Location-grouped split, then write the manifest.
     split_by_loc = location_grouped_split(saved_records, val_fraction, test_fraction, seed)

@@ -93,6 +93,8 @@ def detect_and_crop(model, image_path: str, conf: float = 0.25,
     w, h = img.size
     x1, y1, x2, y2 = best_box
     px, py = (x2 - x1) * pad, (y2 - y1) * pad
-    x1 = max(0, int(x1 - px)); y1 = max(0, int(y1 - py))
-    x2 = min(w, int(x2 + px)); y2 = min(h, int(y2 + py))
+    x1 = max(0, int(x1 - px))
+    y1 = max(0, int(y1 - py))
+    x2 = min(w, int(x2 + px))
+    y2 = min(h, int(y2 + py))
     return img.crop((x1, y1, x2, y2)), (x1, y1, x2, y2)
