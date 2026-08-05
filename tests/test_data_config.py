@@ -154,6 +154,10 @@ def test_letterbox_beats_centre_crop_at_keeping_edges():
 
 def test_megadetector_box_maps_back_to_image_coordinates():
     """The letterbox-undo maths must return boxes in the original image frame."""
+    # src.megadetector imports yolov5 lazily inside best_animal_box, so importing
+    # the module alone does NOT prove the dependency is present - skip on yolov5
+    # itself. yolov5 is an optional extra (CI installs neither detector).
+    pytest.importorskip("yolov5")
     md = pytest.importorskip("src.megadetector")
     torch_mod = pytest.importorskip("torch")
 

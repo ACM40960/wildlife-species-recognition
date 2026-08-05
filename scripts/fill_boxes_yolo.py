@@ -51,6 +51,10 @@ def fill_manifest_boxes(data_dir, manifest_name="manifest.csv",
         raise SystemExit(f"empty manifest: {path}")
 
     fieldnames = list(rows[0].keys())
+    if "has_bbox" not in fieldnames:
+        raise SystemExit(
+            f"{path} has no 'has_bbox' column; this does not look like a manifest "
+            "written by scripts/build_night_wildlife.py")
     if "box_source" not in fieldnames:
         fieldnames.insert(fieldnames.index("has_bbox") + 1, "box_source")
 
@@ -108,8 +112,9 @@ if __name__ == "__main__":
                          "megadetector, .cct_cache/yolov8n.pt for yolov8)")
     ap.add_argument("--conf", type=float, default=0.2)
     ap.add_argument("--refresh", action="store_true",
-                    help="re-detect every frame, replacing existing detector boxes "
-                         "(ground-truth rows are still preserved)")
+                    help="re-detect frames that already have a DETECTOR box, "
+                         "replacing the box and relabelling box_source to the "
+                         "detector used now; ground-truth rows are never touched")
     ap.add_argument("--detector", default="megadetector",
                     choices=["megadetector", "yolov8"],
                     help="megadetector = camera-trap detector (recommended)")
