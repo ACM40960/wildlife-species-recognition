@@ -48,6 +48,13 @@ between train, validation and test. The assignment is deterministic given the
 seed and recorded in the manifest; `src/data.py` reads it. A stratified random
 split is still available (`--split-by stratified`) for comparison.
 
+Note that the location-held-out run additionally holds out a *seen-location* slice
+from training (`seen_test_fraction`, §5), so it trains on fewer images (~625) than
+the stratified run (~840). When comparing the location-held-out (0.55) and
+same-location (0.64) numbers, part of the difference is this training-set-size
+difference, not only the split — so the seen-vs-unseen comparison (§5), which uses
+one model on both, is the cleaner measure of the generalisation gap.
+
 **Manifest & validation.** `scripts/build_night_wildlife.py` writes
 `data/night_wildlife/manifest.csv`, one row per image: split, class, saved
 filename, source CCT image id, original filename, camera location, sequence id,

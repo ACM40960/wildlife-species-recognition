@@ -190,6 +190,13 @@ not claim the model generalises broadly** — it is trained on 6 species and 1,2
 low-resolution frames, and 0.55 is the measured accuracy on *these* unseen
 Caltech Camera Traps sites, not a claim about other datasets, regions, or species.
 
+> **Caveat on the 0.55 vs 0.64 gap.** The location-held-out run also holds out a
+> *seen-location* slice from training (`seen_test_fraction`, for the seen-vs-unseen
+> comparison), so it trains on fewer images (~625) than the same-location run
+> (~840). Part of the 0.55→0.64 difference is therefore this training-set-size
+> difference, not only the split. The **seen-vs-unseen** comparison below is the
+> clean one, because it uses a single model evaluated on both.
+
 Exact commands (CPU; seed 42; each writes `metrics.json` + plots):
 
 ```bash
