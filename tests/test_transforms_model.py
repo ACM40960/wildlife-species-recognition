@@ -1,9 +1,4 @@
 """Tests for preprocessing transforms and model freezing."""
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import pytest
 
 from src.data import build_transforms

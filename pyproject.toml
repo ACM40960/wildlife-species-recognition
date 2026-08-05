@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "night-wildlife"
+version = "0.1.0"
+description = "Night-vision (infrared) wildlife species classification on camera-trap images (ACM 40960 Project 9)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Srivani Konda" },
+    { name = "Navya Sri Mungamuri" },
+]
+
+# Runtime dependencies are listed (with tested ranges) in requirements.txt; install
+# with `pip install -r requirements.txt`. `pip install -e .` makes `src` importable
+# so scripts and tests can `import src...` without a sys.path shim.
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.pytest.ini_options]
+# Put the repo root on sys.path so `import src` / `import scripts` work in tests
+# without per-file sys.path juggling.
+pythonpath = ["."]
+testpaths = ["tests"]
+
+# flake8 does not read pyproject.toml; its config lives in setup.cfg.

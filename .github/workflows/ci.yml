@@ -23,6 +23,7 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
+          pip install -e . --no-deps       # verify the package builds/installs
 
       - name: Syntax check (compile all sources)
         run: python -m compileall src scripts tests

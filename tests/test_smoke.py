@@ -4,9 +4,6 @@ Runs entirely offline (no ImageNet weights, no dataset download) so CI can verif
 the whole pipeline wires together and produces its outputs.
 """
 import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 

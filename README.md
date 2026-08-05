@@ -63,6 +63,8 @@ You need Python 3.9+ and the packages in `requirements.txt`.
 
 ```bash
 pip install -r requirements.txt
+# optional: `pip install -e .` installs the project so `import src...` works from
+# anywhere (the scripts also run directly from the repo without it).
 ```
 
 **1. Train.** ImageNet-pretrained ResNet-18, infrared (grayscale) input,
