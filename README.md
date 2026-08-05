@@ -102,18 +102,20 @@ python scripts/predict.py data/night_wildlife/bobcat/bobcat_0032.jpg \
 ```
 
 ```
-Predictions for data/night_wildlife/bobcat/bobcat_0032.jpg  [input: dataset manifest box]
-  1. bobcat               0.956
-  2. raccoon              0.027
-  3. rabbit               0.007
+Predictions for data/night_wildlife/bobcat/bobcat_0032.jpg  [input: dataset manifest box, T=1.07]
+  1. bobcat               0.843
+  2. coyote               0.127
+  3. raccoon              0.015
 ```
 
 Prediction applies the **same animal crop the model was trained on**: the box comes
 from the manifest when the image is part of a built dataset. For an image from
 elsewhere, add `--detect` to locate the animal with YOLOv8, or `--no-crop` to
-classify the whole frame. The bracketed note says which input was used.
+classify the whole frame. Confidences use the same temperature fitted during
+evaluation, so they mean what the reported ECE says (`--no-calibration` shows the
+raw softmax). The bracketed note says which input and calibration were used.
 
-This is one example — at ~0.68 accuracy the model still gets individual images
+This is one example — at ~0.69 accuracy the model still gets individual images
 wrong, so don't read a single prediction as representative.
 
 Everything (checkpoint, `metrics.json`, and the plots) is written to
@@ -129,10 +131,10 @@ small (233 images), so every number is reported with a 95% confidence interval.
 
 | Locations | What it measures | Accuracy (95% CI) |
 |-----------|------------------|-------------------|
-| **Unseen** (held-out sites) | generalisation to **new cameras** — the honest number | **0.68** (0.62–0.74) |
-| Seen (held-out images from training sites) | performance on familiar backgrounds | 0.81 |
+| **Unseen** (held-out sites) | generalisation to **new cameras** — the honest number | **0.69** (0.63–0.74) |
+| Seen (held-out images from training sites) | performance on familiar backgrounds | 0.80 |
 
-The **+0.13** gap between seen and unseen locations is the key result: even with
+The **+0.11** gap between seen and unseen locations is the key result: even with
 the animal cropped out of the frame, a model still does noticeably better on
 cameras it has seen. Random guessing with 6 classes is 0.17.
 
@@ -141,28 +143,34 @@ Other metrics on the unseen-location test set:
 | Metric | Value |
 |--------|-------|
 | Balanced accuracy | 0.68 |
-| Macro-F1 (95% CI) | 0.68 (0.62–0.73) |
-| Top-2 / Top-3 accuracy | 0.82 / 0.87 |
-| Expected calibration error | 0.07 (temperature-scaled, T=1.07) |
+| Macro-F1 (95% CI) | 0.68 (0.62–0.74) |
+| Top-2 / Top-3 accuracy | 0.83 / 0.87 |
+| Expected calibration error | 0.05 (temperature-scaled, T=1.07) |
 
 **Detected-animal vs. full-frame** (issue: does cropping to the animal help?),
 same location split:
 
 | Input | Box coverage | Unseen acc | ECE |
 |-------|-------------|-----------|-----|
-| **Detected animal** (crop to box) | 86% (GT + MegaDetector) | **0.68** | 0.07 |
+| **Detected animal** (crop to box) | 86% (GT + MegaDetector) | **0.69** | 0.05 |
 | Full frame | — | 0.46 | 0.22 |
 
 Cropping to the animal is what makes this work: showing the classifier the whole
-frame costs ~20 points. Three changes took the honest number from 0.55 to **0.68**
+frame costs ~20 points. Two changes took the honest number from 0.55 to **0.69**
 (see [`docs/experiments.md`](docs/experiments.md) for the run log):
 
-| Change | Unseen acc |
-|--------|-----------|
-| Baseline (centre-crop, COCO-YOLO boxes at 66%) | 0.55 |
-| + letterbox padding & infrared augmentation | ~0.61 |
-| + MegaDetector boxes (86% coverage) | 0.66 |
-| + test-time augmentation & temperature scaling | **0.68** |
+| Change | Unseen acc | ECE |
+|--------|-----------|-----|
+| Baseline (centre-crop, COCO-YOLO boxes at 66%) | 0.55 | 0.15 |
+| + letterbox padding & infrared augmentation | 0.61 | — |
+| + MegaDetector boxes (86% coverage) | **0.69** | 0.05 |
+
+Two things we tried that did **not** help accuracy, reported for honesty:
+**test-time augmentation** (mirror averaging) measured slightly *worse* on this
+data (0.687 → 0.682) and is off by default; **temperature scaling** cannot change
+accuracy at all — it is a monotonic rescaling — and improves only calibration
+(ECE 0.054 → 0.048). Most of the calibration gain came from the better model
+itself, not from the calibration step.
 
 > The full-frame row is from a separate run under the same location split; its
 > `results/samelocation` counterpart predates the current metrics schema, so treat
@@ -189,7 +197,7 @@ predictions and errors.
 
 ## Known limitations
 
-- The 0.68 is from a **small** dataset (200 images/species) with only six species;
+- The 0.69 is from a **small** dataset (200 images/species) with only six species;
   behaviour on rare species and at larger scale is untested.
 - Bounding boxes cover 86% of the frames (ground-truth + MegaDetector); the
   remaining 14% are classified from the whole (letterbox-padded) frame, so those

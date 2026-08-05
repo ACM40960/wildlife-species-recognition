@@ -87,9 +87,10 @@ def _collect(net, loader, device, tta: bool = False, temperature: float = 1.0):
     """Run the model over a loader and return (y_true, y_pred, probabilities).
 
     Args:
-        tta: average the softmax over the image and its horizontal mirror. A
-            camera-trap animal is equally likely to face either way, so this is a
-            free, label-preserving ensemble.
+        tta: average the logits over the image and its horizontal mirror. In
+            principle a free ensemble (an animal faces either way), but measured on
+            this dataset it slightly hurts both accuracy and calibration, so it is
+            off by default.
         temperature: divide logits by this before softmax. Fitted on the
             validation split, it calibrates confidence without changing the
             ranking (so accuracy is unchanged, ECE improves).
@@ -160,11 +161,11 @@ def _validate_checkpoint(state, cfg, dataset_class_names):
             f"  dataset:    {list(dataset_class_names)}\n"
             "Re-evaluate against the dataset the checkpoint was trained on.")
     ck = state.get("config", {}) or {}
-    # crop_to_bbox and split_by matter as much as the architecture: scoring a
-    # crop-trained model on full frames (or against a different split) silently
-    # reports the wrong number rather than failing.
+    # Any setting that changes the pixels the model is shown, or which split it is
+    # scored on, must match — scoring a crop-trained model on full frames would
+    # otherwise silently report the wrong number instead of failing.
     for field in ("backbone", "image_size", "grayscale_to_rgb",
-                  "crop_to_bbox", "split_by"):
+                  "crop_to_bbox", "pad_to_square", "split_by"):
         if field in ck and getattr(cfg, field) != ck[field]:
             raise ValueError(
                 f"config mismatch on '{field}': checkpoint={ck[field]!r}, "
@@ -324,7 +325,7 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
                   num_workers=safe_num_workers(cfg.num_workers))
     test_loader = DataLoader(datasets.test, shuffle=False, **common)
 
-    tta = getattr(cfg, "tta", True)
+    tta = getattr(cfg, "tta", False)
     # Calibrate on validation (never on test), so the reported ECE is honest.
     temperature = 1.0
     if getattr(cfg, "temperature_scaling", True) and len(datasets.val) > 0:

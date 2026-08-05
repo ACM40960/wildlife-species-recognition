@@ -22,6 +22,22 @@ from src.data import build_transforms, crop_to_box, lookup_bbox  # noqa: E402
 from src.model import build_model  # noqa: E402
 
 
+def _saved_temperature(checkpoint_path):
+    """Read the temperature fitted during evaluation, from metrics.json alongside
+    the checkpoint. Falls back to 1.0 (no calibration) when unavailable."""
+    import json
+
+    path = os.path.join(os.path.dirname(os.path.abspath(checkpoint_path)),
+                        "metrics.json")
+    if not os.path.exists(path):
+        return 1.0
+    try:
+        with open(path) as fh:
+            return float(json.load(fh).get("temperature", 1.0)) or 1.0
+    except Exception:
+        return 1.0
+
+
 def resolve_box(image_path, use_detect, no_crop):
     """Return (box, how) describing which crop to apply."""
     if no_crop:
@@ -50,6 +66,8 @@ def main():
     ap.add_argument("--detect", action="store_true",
                     help="use YOLOv8 to find the animal when the image has no "
                          "manifest box")
+    ap.add_argument("--no-calibration", action="store_true",
+                    help="skip the fitted temperature and show raw softmax")
     ap.add_argument("--no-crop", action="store_true",
                     help="classify the whole frame (matches a model trained with "
                          "--no-crop-to-bbox)")
@@ -77,12 +95,22 @@ def main():
                           pad_to_square=getattr(cfg, "pad_to_square", True))
     img = crop_to_box(Image.open(args.image).convert("RGB"), box)
     x = tf(img).unsqueeze(0)
+
+    # Match evaluation exactly: same TTA setting, and the temperature that was
+    # fitted on the validation split during evaluation (recorded in metrics.json),
+    # so a printed confidence means the same thing as the reported ECE.
+    tta = getattr(cfg, "tta", False)
+    temperature = _saved_temperature(args.checkpoint) if not args.no_calibration else 1.0
     with torch.no_grad():
-        probs = torch.softmax(net(x), dim=1).squeeze(0)
+        logits = net(x)
+        if tta:
+            logits = (logits + net(torch.flip(x, dims=[3]))) / 2
+        probs = torch.softmax(logits / temperature, dim=1).squeeze(0)
 
     topk = min(args.topk, len(class_names))
     scores, idx = probs.topk(topk)
-    print(f"Predictions for {args.image}  [input: {how}]")
+    calib = f", T={temperature:.2f}" if temperature != 1.0 else ""
+    print(f"Predictions for {args.image}  [input: {how}{'; TTA' if tta else ''}{calib}]")
     for rank, (s, i) in enumerate(zip(scores.tolist(), idx.tolist()), 1):
         print(f"  {rank}. {class_names[i]:20s} {s:.3f}")
 

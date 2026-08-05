@@ -25,5 +25,6 @@
   "device": "cpu",
   "output_dir": "results/v5_final",
   "checkpoint_name": "best_model.pt",
-  "experiment_name": "night_wildlife_resnet18"
+  "experiment_name": "night_wildlife_resnet18",
+  "tta": false
 }

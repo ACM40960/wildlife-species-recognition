@@ -53,7 +53,11 @@ class Config:
     early_stop_patience: int = 5           # stop if val acc stalls this many epochs
 
     # --- Evaluation ---
-    tta: bool = True                       # average over the horizontal mirror
+    tta: bool = False                      # average over the horizontal mirror.
+                                           # Measured on this dataset it costs 2x
+                                           # inference and slightly HURTS both
+                                           # accuracy and calibration, so it is
+                                           # off by default (--tta to enable).
     temperature_scaling: bool = True       # calibrate confidence on the val split
 
     # --- Runtime ---
