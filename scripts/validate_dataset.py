@@ -96,7 +96,7 @@ def validate(data_dir, manifest_name="manifest.csv", tolerance=0.0):
     with_box = sum(1 for r in rows if str(r.get("has_bbox")).lower() == "true")
     _ok(f"frames with a bounding box: {with_box}/{len(rows)} "
         f"({100*with_box/max(len(rows),1):.0f}%); the rest are classified from the "
-        f"whole frame (resize + centre-crop)")
+        f"whole frame (letterbox-padded)")
 
     # 5. split overlap (each filename in exactly one split — trivially true per row,
     #    but check no filename is duplicated across rows)

@@ -88,7 +88,8 @@ if __name__ == "__main__":
     ap.add_argument("--data-dir", default="data/night_wildlife")
     ap.add_argument("--manifest-name", default="manifest.csv")
     ap.add_argument("--weights", default=None,
-                    help="path to yolov8 weights (default: .cct_cache/yolov8n.pt)")
+                    help="detector weights (default: .cct_cache/md_v5a.0.0.pt for "
+                         "megadetector, .cct_cache/yolov8n.pt for yolov8)")
     ap.add_argument("--conf", type=float, default=0.2)
     ap.add_argument("--detector", default="megadetector",
                     choices=["megadetector", "yolov8"],

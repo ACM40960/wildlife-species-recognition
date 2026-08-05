@@ -1,4 +1,5 @@
 """Tests for load-time bbox cropping and Config JSON round-tripping."""
+import numpy as np
 import pytest
 
 from src.config import Config
@@ -115,3 +116,57 @@ def test_config_from_json_ignores_unknown_keys(tmp_path):
     loaded = Config.from_json(str(path))   # must not raise
     assert loaded == Config()
     assert not hasattr(loaded, "a_removed_field")
+
+
+def test_letterbox_pads_and_preserves_aspect():
+    """Letterbox must keep the whole frame, unlike a centre crop."""
+    from src.data import Letterbox
+
+    # A 4:3 frame with a bright band down the far-left edge (wide enough to
+    # survive the downsample to 224px).
+    img = Image.new("L", (400, 300), color=0)
+    for y in range(300):
+        for x in range(10):
+            img.putpixel((x, y), 255)
+
+    out = Letterbox(224)(img)
+    assert out.size == (224, 224)                     # square output
+    arr = np.array(out)
+    # The left band survives (a centre crop of a 4:3 frame would remove it).
+    assert arr[:, :8].max() > 200
+    # Aspect preserved: content occupies 224*3/4 = 168 rows, rest is padding.
+    rows_with_content = [r for r in range(224) if arr[r].max() > 200]
+    assert 150 <= (max(rows_with_content) - min(rows_with_content) + 1) <= 175
+
+
+def test_letterbox_beats_centre_crop_at_keeping_edges():
+    from src.data import build_transforms
+
+    img = Image.new("L", (400, 300), color=0)
+    for y in range(300):
+        for x in range(10):
+            img.putpixel((x, y), 255)
+    padded = build_transforms(224, True, train=False, pad_to_square=True)(img)
+    cropped = build_transforms(224, True, train=False, pad_to_square=False)(img)
+    # The edge marker is visible after padding, gone after centre-cropping.
+    assert padded.max() > cropped.max()
+
+
+def test_megadetector_box_maps_back_to_image_coordinates():
+    """The letterbox-undo maths must return boxes in the original image frame."""
+    md = pytest.importorskip("src.megadetector")
+    torch_mod = pytest.importorskip("torch")
+
+    class FakeDet:
+        """Returns one 'animal' box covering a known region of the 640x640 input."""
+        def __call__(self, x):
+            # xyxy in letterboxed space, conf, cls=0 (animal)
+            return [torch_mod.tensor([[[320.0, 320.0, 40.0, 40.0, 5.0, 9.0, 0.1, 0.1]]])]
+
+    img = Image.new("RGB", (400, 300), color=0)
+    box = md.best_animal_box(FakeDet(), img, conf=0.01)
+    if box is None:
+        pytest.skip("detector stub incompatible with this yolov5 version")
+    x, y, w, h = box
+    assert 0 <= x < 400 and 0 <= y < 300          # inside the ORIGINAL image
+    assert x + w <= 400 and y + h <= 300

@@ -17,8 +17,15 @@ scikit-learn>=1.3,<2     # tested: 1.9
 # Plotting (confusion matrix, training curves)
 matplotlib>=3.7,<4       # tested: 3.11
 
-# --- Optional extras (not required for the core train/eval/predict pipeline) ---
-# YOLOv8 detect-and-crop stage (src/detect.py):
+# --- Detection stage (only needed to (re)build the dataset's bounding boxes) ---
+# MegaDetector is the default detector for scripts/fill_boxes_yolo.py. Its weights
+# are a YOLOv5 checkpoint, so the yolov5 package is required; yolov5 still imports
+# pkg_resources, which setuptools 81+ removed.
+#   pip install "yolov5>=7.0,<8" "setuptools<81"
+# Alternative COCO detector (--detector yolov8, src/detect.py):
 #   pip install "ultralytics>=8.0,<9"
 # OpenCV image preprocessing:
 #   pip install "opencv-python-headless>=4.7,<5"
+#
+# Training, evaluation and prediction do NOT need any of the above: the committed
+# dataset already carries its boxes in the manifest.
