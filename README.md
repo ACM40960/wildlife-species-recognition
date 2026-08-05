@@ -79,6 +79,13 @@ python scripts/run_training.py --data-dir data/night_wildlife --epochs 16 \
 (If your machine can't download the pretrained weights automatically, run
 `python scripts/fetch_pretrained_weights.py` first.)
 
+> **Running in Codespaces / Docker?** Data loading runs in-process by default
+> (`num_workers=0`) because containers usually mount a tiny `/dev/shm` (~64MB),
+> and DataLoader workers pass batches through it — which fails with
+> `RuntimeError: unable to allocate shared memory ... No space left on device`.
+> If your `/dev/shm` is large (`df -h /dev/shm`), speed loading up with
+> `--num-workers 2`.
+
 **2. Evaluate** on the held-out test set. This prints the scores and saves the
 plots:
 

@@ -246,11 +246,36 @@ def load_datasets(cfg) -> Datasets:
     )
 
 
+def safe_num_workers(requested: int, min_shm_mb: int = 256) -> int:
+    """Drop to 0 workers when /dev/shm is too small to be safe.
+
+    DataLoader worker processes hand batches to the parent through shared memory.
+    Containers (Docker default, GitHub Codespaces) often mount /dev/shm at only
+    ~64MB, and the run dies mid-epoch with
+    ``RuntimeError: unable to allocate shared memory ... No space left on device``.
+    Loading in-process (0 workers) avoids shared memory entirely; on this dataset
+    it costs little because the images are small.
+    """
+    if requested <= 0:
+        return 0
+    try:
+        st = os.statvfs("/dev/shm")
+        shm_mb = st.f_blocks * st.f_frsize / (1024 * 1024)
+    except (OSError, AttributeError):
+        return requested                      # not Linux / can't tell: respect it
+    if shm_mb < min_shm_mb:
+        print(f"[data] /dev/shm is only {shm_mb:.0f}MB; using num_workers=0 "
+              f"(requested {requested}) to avoid shared-memory errors.")
+        return 0
+    return requested
+
+
 def make_loaders(cfg, datasets: Datasets):
     """Wrap the subsets in DataLoaders."""
     from torch.utils.data import DataLoader
 
-    common = dict(batch_size=cfg.batch_size, num_workers=cfg.num_workers,
+    workers = safe_num_workers(cfg.num_workers)
+    common = dict(batch_size=cfg.batch_size, num_workers=workers,
                   pin_memory=(cfg.resolved_device() == "cuda"))
     return (
         DataLoader(datasets.train, shuffle=True, **common),

@@ -26,7 +26,11 @@ class Config:
                                            # (not trained) to measure accuracy on
                                            # SEEN locations vs the unseen test set
     grayscale_to_rgb: bool = True          # IR frames are 1-channel; repeat to 3
-    num_workers: int = 2
+    num_workers: int = 0                   # 0 = load in-process. DataLoader workers
+                                           # pass tensors through /dev/shm, which is
+                                           # tiny (~64MB) in Docker/Codespaces and
+                                           # causes "No space left on device (28)".
+                                           # Raise it only if /dev/shm is large.
 
     # --- Model ---
     backbone: str = "resnet18"             # resnet18 | resnet34 | resnet50

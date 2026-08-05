@@ -21,7 +21,7 @@ from typing import Dict
 
 import numpy as np
 
-from .data import load_datasets
+from .data import load_datasets, safe_num_workers
 from .model import build_model
 from .utils import ensure_dir, set_seed, plot_confusion_matrix, load_checkpoint
 
@@ -265,7 +265,8 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
     net.load_state_dict(state["model_state"])
 
     from torch.utils.data import DataLoader
-    common = dict(batch_size=cfg.batch_size, num_workers=cfg.num_workers)
+    common = dict(batch_size=cfg.batch_size,
+                  num_workers=safe_num_workers(cfg.num_workers))
     test_loader = DataLoader(datasets.test, shuffle=False, **common)
 
     y_true, y_pred, probs = _collect(net, test_loader, device)
