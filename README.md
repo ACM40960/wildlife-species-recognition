@@ -96,16 +96,24 @@ python scripts/run_evaluation.py --output-dir results/demo --device cpu
 **3. Predict** on a single image:
 
 ```bash
-python scripts/predict.py data/night_wildlife/coyote/coyote_0003.jpg \
+python scripts/predict.py data/night_wildlife/bobcat/bobcat_0032.jpg \
     --checkpoint results/demo/best_model.pt
 ```
 
 ```
-Predictions for data/night_wildlife/coyote/coyote_0003.jpg:
-  1. coyote               0.933
-  2. raccoon              0.046
-  3. rabbit               0.009
+Predictions for data/night_wildlife/bobcat/bobcat_0032.jpg  [input: dataset manifest box]
+  1. bobcat               0.956
+  2. raccoon              0.027
+  3. rabbit               0.007
 ```
+
+Prediction applies the **same animal crop the model was trained on**: the box comes
+from the manifest when the image is part of a built dataset. For an image from
+elsewhere, add `--detect` to locate the animal with YOLOv8, or `--no-crop` to
+classify the whole frame. The bracketed note says which input was used.
+
+This is one example — at ~0.55 accuracy the model gets a fair share of individual
+images wrong, so don't read a single prediction as representative.
 
 Everything (checkpoint, `metrics.json`, and the plots) is written to
 `results/demo/`. A saved copy of the plots is in

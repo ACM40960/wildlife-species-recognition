@@ -142,6 +142,52 @@ def _carve_seen_test(train_rows, fraction, seed):
     return kept, seen
 
 
+BBOX_PAD = 0.15          # fraction of box size added as padding on each side
+
+
+def lookup_bbox(image_path: str, manifest_name: str = "manifest.csv"):
+    """Find an image's recorded bounding box by searching parent dirs for a manifest.
+
+    Returns ``(x, y, w, h)`` if the image appears in a manifest with a box, else
+    None. Used so single-image prediction applies the same crop the model was
+    trained with.
+    """
+    path = os.path.abspath(image_path)
+    directory = os.path.dirname(path)
+    while True:
+        candidate = os.path.join(directory, manifest_name)
+        if os.path.exists(candidate):
+            rel = os.path.relpath(path, directory).replace(os.sep, "/")
+            for row in read_manifest(directory, manifest_name) or []:
+                if row.get("filename") == rel:
+                    return _parse_bbox(row.get("bbox", ""))
+            return None
+        parent = os.path.dirname(directory)
+        if parent == directory:          # reached the filesystem root
+            return None
+        directory = parent
+
+
+def crop_to_box(img, box, pad: float = BBOX_PAD):
+    """Crop a PIL image to a padded ``(x, y, w, h)`` box.
+
+    Returns the image unchanged when ``box`` is None or the padded box would be
+    degenerate. This is the single implementation of the animal crop — training,
+    evaluation and single-image prediction all call it, so the preprocessing a
+    model is served with cannot drift from what it was trained on.
+    """
+    if box is None:
+        return img
+    x, y, w, h = box
+    px, py = w * pad, h * pad
+    W, H = img.size
+    left, top = max(0, int(x - px)), max(0, int(y - py))
+    right, bottom = min(W, int(x + w + px)), min(H, int(y + h + py))
+    if right - left <= 5 or bottom - top <= 5:
+        return img
+    return img.crop((left, top, right, bottom))
+
+
 class ManifestDataset:
     """Dataset driven by the manifest, cropping to the animal box at *load* time.
 
@@ -151,7 +197,7 @@ class ManifestDataset:
     """
 
     def __init__(self, rows, data_dir, class_to_idx, transform,
-                 crop_to_bbox=True, bbox_pad=0.15):
+                 crop_to_bbox=True, bbox_pad=BBOX_PAD):
         from torch.utils.data import Dataset  # noqa: F401  (documents the interface)
         self.rows = rows
         self.data_dir = data_dir
@@ -169,14 +215,7 @@ class ManifestDataset:
         row = self.rows[i]
         img = Image.open(os.path.join(self.data_dir, row["filename"])).convert("RGB")
         box = _parse_bbox(row.get("bbox", "")) if self.crop_to_bbox else None
-        if box is not None:
-            x, y, w, h = box
-            px, py = w * self.bbox_pad, h * self.bbox_pad
-            W, H = img.size
-            crop = (max(0, int(x - px)), max(0, int(y - py)),
-                    min(W, int(x + w + px)), min(H, int(y + h + py)))
-            if crop[2] - crop[0] > 5 and crop[3] - crop[1] > 5:
-                img = img.crop(crop)
+        img = crop_to_box(img, box, self.bbox_pad)
         return self.transform(img), self.class_to_idx[row["class"]]
 
 

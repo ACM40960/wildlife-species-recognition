@@ -53,6 +53,48 @@ def test_crop_disabled_uses_full_frame(tmp_path):
     assert torch.allclose(a, b)
 
 
+def test_predict_uses_same_crop_as_training(tmp_path):
+    """Serving must apply the same animal crop the model was trained on.
+
+    Regression test: predict.py used to classify the full frame while training and
+    evaluation used the bbox crop, which nearly halved accuracy on boxed frames.
+    """
+    import csv
+
+    from src.data import crop_to_box, lookup_bbox
+
+    (tmp_path / "x").mkdir()
+    img = Image.new("L", (100, 100), color=0)
+    for y in range(10, 30):
+        for x in range(10, 30):
+            img.putpixel((x, y), 255)
+    img.save(tmp_path / "x" / "img.jpg")
+    with open(tmp_path / "manifest.csv", "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=["split", "class", "filename", "bbox",
+                                           "has_bbox", "image_id"])
+        w.writeheader()
+        w.writerow({"split": "test", "class": "x", "filename": "x/img.jpg",
+                    "bbox": "10;10;20;20", "has_bbox": "True", "image_id": "id0"})
+
+    path = str(tmp_path / "x" / "img.jpg")
+    box = lookup_bbox(path)
+    assert box == (10, 10, 20, 20)          # found via the manifest
+
+    tf = _tiny_transform()
+    served = tf(crop_to_box(Image.open(path).convert("RGB"), box))
+    rows = [{"class": "x", "filename": "x/img.jpg", "bbox": "10;10;20;20",
+             "image_id": "id0"}]
+    trained = ManifestDataset(rows, str(tmp_path), {"x": 0}, tf, crop_to_bbox=True)[0][0]
+    assert torch.allclose(served, trained)  # identical preprocessing
+
+
+def test_lookup_bbox_returns_none_without_manifest(tmp_path):
+    (tmp_path / "y").mkdir()
+    Image.new("L", (32, 32)).save(tmp_path / "y" / "img.jpg")
+    from src.data import lookup_bbox
+    assert lookup_bbox(str(tmp_path / "y" / "img.jpg")) is None
+
+
 def test_config_json_round_trip(tmp_path):
     cfg = Config()
     cfg.epochs = 7
