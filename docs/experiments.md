@@ -28,11 +28,17 @@ smoothing 0.05; seed 42. "Split" = how train/val/test is partitioned.
 | 2026-07-21 | v3 · crop=detected · 16 ep | location · **seen** | 0.718 | — | Same model, seen-location holdout. Seen−unseen gap **+0.17**. |
 | 2026-07-21 | v3 · crop=**full frame** · 16 ep | location · unseen | 0.459 | 0.455 | Full-frame input. Detected-animal beats it by ~0.09; ECE 0.22. |
 | 2026-07-21 | v3 · crop=detected + **YOLO-filled boxes** (66%) | location · unseen | 0.545 | 0.542 | YOLO raised box coverage 50%→66%; accuracy unchanged within CI. |
+| 2026-08-05 | v4 · **letterbox + IR augmentation** (66% boxes) | location · unseen | 0.614 | 0.617 | Padding instead of centre-crop stops cutting animals off; gamma/erasing aug. |
+| 2026-08-05 | **v5 · + MegaDetector boxes (86%) + TTA + temp. scaling** | **location · unseen** | **0.682** | 0.677 | **Current headline.** 95% CI 0.620–0.739; top-2 0.82; ECE 0.072 (T=1.07). |
+| 2026-08-05 | v5 · same model | location · **seen** | 0.809 | — | Seen−unseen gap narrowed to **+0.13** (was +0.17). |
 
 Key results:
 
-- **Seen vs. unseen** (one model): 0.72 on seen camera sites vs **0.55** on unseen
-  sites — a +0.17 generalisation gap that persists even with the animal cropped.
+- **Seen vs. unseen** (one model): 0.81 on seen camera sites vs **0.68** on unseen
+  sites — a +0.13 generalisation gap that persists even with the animal cropped.
+- **What moved the number** from 0.55 to 0.68: letterbox padding + infrared
+  augmentation (+0.07), MegaDetector boxes raising coverage 66%→86% (+0.05), and
+  TTA + temperature scaling (+0.02, and ECE 0.15→0.07).
 - **Detected animal vs. full frame** (same split): cropping to the bounding box
   lifts unseen accuracy 0.46 → **0.55** and cuts calibration error by about a
   third (0.22 → 0.15).

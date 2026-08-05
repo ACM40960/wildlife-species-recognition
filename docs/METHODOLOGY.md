@@ -37,8 +37,8 @@ animal's bounding box is recorded in the manifest and the **crop is applied at
 load time** (`crop_to_bbox`, `src/data.py`): if a box exists the loader crops to
 it (15% padding); otherwise the whole frame is used. Nothing is baked into the
 files, so the crop strategy (box vs. whole frame) is a runtime choice and the
-originals are preserved. 66% of the committed frames carry a bounding box
-(50% ground-truth, the rest added by the YOLO fill step — see §6).
+originals are preserved. 86% of the committed frames carry a bounding box
+(66% ground-truth, the rest added by the MegaDetector fill step — see §6).
 
 **Split — location-held-out.** Camera-trap frames from the same site share
 backgrounds, so a random split lets the model recognise the *location* instead of
@@ -77,8 +77,14 @@ Infrared frames are single-channel. Because the backbone was pretrained on
   flip, `RandomRotation(±10°)`, and colour jitter (brightness ±0.2, contrast
   ±0.2). These mimic the pose, framing, and brightness variation of real camera
   traps.
-- **Validation/test transforms:** deterministic resize (to 1.15×) + centre crop.
-  No augmentation, so the reported metrics are on clean inputs.
+- **Letterbox padding:** frames are resized preserving aspect ratio and padded to
+  a square rather than centre-cropped. A centre crop of a 4:3 frame discarded ~35%
+  of its width and could remove the animal entirely.
+- **Infrared-specific augmentation:** gamma/brightness jitter (IR flash exposure
+  varies widely), mild sharpness jitter, and random erasing, which simulates
+  occlusion and discourages relying on the background.
+- **Validation/test transforms:** letterbox only — deterministic, no augmentation,
+  and nothing cropped away.
 
 ## 3. Model
 
@@ -136,6 +142,11 @@ writes:
 - **Metrics** (`metrics.json`), all with 95% confidence intervals because the
   test set is small (~30/species):
   - accuracy with a **Wilson** interval;
+  - **test-time augmentation**: the softmax is averaged over the frame and its
+    horizontal mirror (an animal faces either way with equal probability);
+  - **temperature scaling**: one temperature is fitted on the *validation* split
+    (never on test) and applied to the logits. It leaves predictions and accuracy
+    untouched and only makes the confidences honest — ECE fell 0.15 → 0.07.
   - **balanced accuracy** and macro precision/recall/F1, with a **bootstrap**
     interval on macro-F1;
   - **top-2 / top-3** accuracy;
@@ -174,12 +185,12 @@ box is used by the same load-time `crop_to_bbox` path as the ground-truth boxes.
 `scripts/fetch_yolo_weights.py` fetches the weights from a checksum-verified
 mirror for offline environments.
 
-The detector's *class* prediction is ignored — an infrared deer may be called
-"cow"; only the box is used, to crop to the animal. Filling boxes to 66% coverage
-left held-out accuracy unchanged within the confidence interval (0.55 → 0.545),
-so the extra YOLO boxes add coverage but little classification signal on this
-infrared data; fine-tuning a detector on camera-trap boxes is the natural next
-step.
+The detector's *class* prediction is ignored — only the box is used, to crop to
+the animal. The COCO-pretrained YOLOv8 reached 66% coverage but added no
+measurable accuracy, because it has never seen a grayscale infrared frame.
+Switching to **MegaDetector** — trained on camera-trap imagery, with classes
+animal/person/vehicle — raised coverage to 86% and contributed roughly +0.05
+accuracy. `--detector yolov8` keeps the old behaviour for comparison.
 
 ## References
 
