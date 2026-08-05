@@ -30,12 +30,47 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
-def build_transforms(image_size: int, grayscale_to_rgb: bool, train: bool):
+class Letterbox:
+    """Resize preserving aspect ratio and pad to a square — nothing is cut off.
+
+    Centre-cropping a 4:3 camera-trap frame to a square throws away ~35% of its
+    width, which can remove an animal standing near the edge. Padding keeps the
+    whole frame; the grey fill is a neutral value after normalisation.
+    """
+
+    def __init__(self, size: int, fill: int = 114):
+        self.size = size
+        self.fill = fill
+
+    def __call__(self, img):
+        from PIL import Image
+
+        w, h = img.size
+        scale = self.size / max(w, h)
+        nw, nh = max(1, round(w * scale)), max(1, round(h * scale))
+        img = img.resize((nw, nh), Image.BILINEAR)
+        canvas = Image.new(img.mode, (self.size, self.size),
+                           self.fill if img.mode == "L" else (self.fill,) * 3)
+        canvas.paste(img, ((self.size - nw) // 2, (self.size - nh) // 2))
+        return canvas
+
+    def __repr__(self):
+        return f"{type(self).__name__}(size={self.size})"
+
+
+def build_transforms(image_size: int, grayscale_to_rgb: bool, train: bool,
+                     pad_to_square: bool = True, ir_augment: bool = True):
     """Return a torchvision transform pipeline.
 
-    Training augmentations (flips, small rotations, colour jitter, random
-    resized crop) improve robustness to the pose/brightness variation typical of
-    camera-trap frames. Validation/test use a deterministic resize + centre crop.
+    Args:
+        pad_to_square: letterbox-pad instead of centre-cropping, so no part of the
+            frame is discarded (see :class:`Letterbox`).
+        ir_augment: add augmentations suited to grayscale infrared frames — gamma
+            jitter (IR exposure varies a lot), mild blur, and random erasing
+            (simulates occlusion and discourages leaning on the background).
+
+    Training augmentations improve robustness to the pose/brightness variation
+    typical of camera-trap frames. Validation/test are deterministic.
     """
     from torchvision import transforms
 
@@ -47,12 +82,26 @@ def build_transforms(image_size: int, grayscale_to_rgb: bool, train: bool):
         steps.append(transforms.Grayscale(num_output_channels=3))
 
     if train:
+        if pad_to_square:
+            # Letterbox first so scale augmentation samples from the whole frame.
+            steps += [Letterbox(image_size),
+                      transforms.RandomResizedCrop(image_size, scale=(0.8, 1.0))]
+        else:
+            steps.append(transforms.RandomResizedCrop(image_size, scale=(0.7, 1.0)))
         steps += [
-            transforms.RandomResizedCrop(image_size, scale=(0.7, 1.0)),
             transforms.RandomHorizontalFlip(),
             transforms.RandomRotation(10),
             transforms.ColorJitter(brightness=0.2, contrast=0.2),
         ]
+        if ir_augment:
+            steps += [
+                # Gamma/sharpness stand in for IR exposure and focus variation.
+                transforms.RandomApply(
+                    [transforms.ColorJitter(brightness=(0.6, 1.6))], p=0.3),
+                transforms.RandomAdjustSharpness(sharpness_factor=0.4, p=0.2),
+            ]
+    elif pad_to_square:
+        steps.append(Letterbox(image_size))
     else:
         steps += [
             transforms.Resize(int(image_size * 1.15)),
@@ -63,6 +112,9 @@ def build_transforms(image_size: int, grayscale_to_rgb: bool, train: bool):
         transforms.ToTensor(),
         transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
     ]
+    if train and ir_augment:
+        # Random erasing operates on tensors, so it comes after ToTensor.
+        steps.append(transforms.RandomErasing(p=0.25, scale=(0.02, 0.15)))
     return transforms.Compose(steps)
 
 
@@ -234,8 +286,12 @@ def load_datasets(cfg) -> Datasets:
     rows = read_manifest(cfg.data_dir, getattr(cfg, "manifest_name", "manifest.csv"))
     split_by = getattr(cfg, "split_by", "location")
 
-    train_tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=True)
-    eval_tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=False)
+    pad = getattr(cfg, "pad_to_square", True)
+    ir_aug = getattr(cfg, "ir_augment", True)
+    train_tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=True,
+                                pad_to_square=pad, ir_augment=ir_aug)
+    eval_tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=False,
+                               pad_to_square=pad, ir_augment=ir_aug)
 
     if rows is not None:
         print(f"[data] {split_by} split from manifest; crop_to_bbox="

@@ -73,7 +73,8 @@ def main():
     no_crop = args.no_crop or not saved.get("crop_to_bbox", True)
     box, how = resolve_box(args.image, args.detect, no_crop)
 
-    tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=False)
+    tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=False,
+                          pad_to_square=getattr(cfg, "pad_to_square", True))
     img = crop_to_box(Image.open(args.image).convert("RGB"), box)
     x = tf(img).unsqueeze(0)
     with torch.no_grad():
