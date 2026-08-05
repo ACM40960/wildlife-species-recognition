@@ -59,8 +59,11 @@ def build_config() -> Config:
                     default=None,
                     help="fraction of training-location images held out to measure "
                          "seen-location accuracy (0 to train on all of them)")
-    ap.add_argument("--val-fraction", dest="val_fraction", type=float, default=None)
-    ap.add_argument("--test-fraction", dest="test_fraction", type=float, default=None)
+    ap.add_argument("--val-fraction", dest="val_fraction", type=float, default=None,
+                    help="only used with --split-by stratified; the location split "
+                         "comes from the manifest")
+    ap.add_argument("--test-fraction", dest="test_fraction", type=float, default=None,
+                    help="only used with --split-by stratified")
     ap.add_argument("--num-workers", dest="num_workers", type=int, default=None,
                     help="DataLoader workers (default 0). Workers use /dev/shm, "
                          "which is tiny in Docker/Codespaces; raise only if yours "
@@ -79,6 +82,10 @@ def build_config() -> Config:
         val = getattr(args, key, None)
         if val is not None:
             setattr(cfg, key, val)
+    if cfg.split_by == "location" and (args.val_fraction is not None
+                                       or args.test_fraction is not None):
+        print("[warn] --val-fraction/--test-fraction are ignored with "
+              "--split-by location: that split is read from the manifest.")
     return cfg
 
 

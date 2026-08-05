@@ -8,7 +8,7 @@ torch>=2.2,<3            # tested: 2.13
 torchvision>=0.17,<1     # tested: 0.28 (must match the installed torch build)
 
 # Data / numerics
-numpy>=1.24,<3           # tested: 2.4
+numpy>=1.24,<3           # tested: 2.3.5
 Pillow>=9.5,<13          # tested: 12.3
 
 # Metrics, splitting, evaluation

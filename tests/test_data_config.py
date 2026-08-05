@@ -170,3 +170,51 @@ def test_megadetector_box_maps_back_to_image_coordinates():
     x, y, w, h = box
     assert 0 <= x < 400 and 0 <= y < 300          # inside the ORIGINAL image
     assert x + w <= 400 and y + h <= 300
+
+
+def test_box_fill_preserves_provenance_on_rerun(tmp_path, monkeypatch):
+    """Re-running the box fill must not relabel detector boxes as ground truth.
+
+    Regression test: the fill treated any row that already had a box as 'gt', so a
+    second run rewrote 200 YOLO-detected rows to 'gt' and the dataset appeared to
+    have far more ground-truth annotation than it did.
+    """
+    import csv
+    import importlib.util
+    import sys
+
+    (tmp_path / "x").mkdir()
+    for name in ("a", "b", "c"):
+        Image.new("L", (64, 64)).save(tmp_path / "x" / f"{name}.jpg")
+    fields = ["class", "filename", "bbox", "has_bbox", "box_source", "image_id"]
+    start = [
+        {"class": "x", "filename": "x/a.jpg", "bbox": "1;1;9;9", "has_bbox": "True",
+         "box_source": "gt", "image_id": "a"},
+        {"class": "x", "filename": "x/b.jpg", "bbox": "2;2;9;9", "has_bbox": "True",
+         "box_source": "yolov8", "image_id": "b"},
+        {"class": "x", "filename": "x/c.jpg", "bbox": "", "has_bbox": "False",
+         "box_source": "none", "image_id": "c"},
+    ]
+    with open(tmp_path / "manifest.csv", "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=fields)
+        w.writeheader()
+        w.writerows(start)
+
+    spec = importlib.util.spec_from_file_location("fbx", "scripts/fill_boxes_yolo.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["fbx"] = mod
+    spec.loader.exec_module(mod)
+
+    # Stub the detector so the test needs no weights: it always finds a box.
+    monkeypatch.setattr(mod, "load_detector", lambda w=None: object())
+    monkeypatch.setattr(mod, "best_animal_box", lambda m, p, conf=0.2: (3, 3, 9, 9))
+    monkeypatch.setattr(mod, "yolo_available", lambda: True)
+
+    counts = mod.fill_manifest_boxes(str(tmp_path), detector="yolov8")
+
+    after = {r["image_id"]: r["box_source"]
+             for r in csv.DictReader(open(tmp_path / "manifest.csv"))}
+    assert after["a"] == "gt"        # ground truth stays ground truth
+    assert after["b"] == "yolov8"    # detector box is NOT promoted to gt
+    assert after["c"] == "yolov8"    # the boxless row gets detected
+    assert counts["gt"] == 1

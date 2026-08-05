@@ -39,11 +39,18 @@ A ready-made subset is included in the repo at
   (`build_report.txt`) and wipes the output directory first so a re-run can't
   leave stale files.
 
-**Bounding boxes.** 66% of frames carry a ground-truth box from CCT;
-**MegaDetector** — the standard camera-trap detector, trained on infrared frames
-(`scripts/fill_boxes_yolo.py`) — fills in boxes for frames that lack one, raising
-coverage to **86%** (798 ground-truth + 228 MegaDetector). Each row's `box_source`
-column records `gt` / `megadetector` / `none`.
+**Bounding boxes.** 50% of frames carry a ground-truth box from CCT (598 of
+1,200). Detectors fill in the rest: **MegaDetector** — the standard camera-trap
+detector, trained on infrared frames — plus 200 boxes from an earlier COCO YOLOv8
+pass, taking coverage to **86%**. Each row's `box_source` column records where its
+box came from, so detector boxes are never mistaken for ground truth:
+
+| `box_source` | Count | Meaning |
+|--------------|-------|---------|
+| `gt` | 598 | ground-truth box from the CCT dataset |
+| `megadetector` | 228 | detected by MegaDetector |
+| `yolov8` | 200 | detected by the earlier COCO YOLOv8 pass |
+| `none` | 174 | no box; the whole frame is used |
 
 Every image is recorded in
 [`data/night_wildlife/manifest.csv`](data/night_wildlife/manifest.csv) with its
@@ -110,7 +117,8 @@ Predictions for data/night_wildlife/bobcat/bobcat_0032.jpg  [input: dataset mani
 
 Prediction applies the **same animal crop the model was trained on**: the box comes
 from the manifest when the image is part of a built dataset. For an image from
-elsewhere, add `--detect` to locate the animal with YOLOv8, or `--no-crop` to
+elsewhere, add `--detect` to locate the animal (MegaDetector if installed,
+otherwise YOLOv8), or `--no-crop` to
 classify the whole frame. Confidences use the same temperature fitted during
 evaluation, so they mean what the reported ECE says (`--no-calibration` shows the
 raw softmax). The bracketed note says which input and calibration were used.
@@ -152,7 +160,7 @@ same location split:
 
 | Input | Box coverage | Unseen acc | ECE |
 |-------|-------------|-----------|-----|
-| **Detected animal** (crop to box) | 86% (GT + MegaDetector) | **0.69** | 0.05 |
+| **Detected animal** (crop to box) | 86% (598 GT + 428 detected) | **0.69** | 0.05 |
 | Full frame | — | 0.46 | 0.22 |
 
 Cropping to the animal is what makes this work: showing the classifier the whole

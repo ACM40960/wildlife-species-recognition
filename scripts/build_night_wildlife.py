@@ -209,9 +209,14 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
     norm = os.path.normpath(out_dir)
     if os.path.exists(norm):
         # An explicit raise, not assert: asserts are stripped under `python -O`,
-        # and this guard stands between a typo and an rmtree.
-        if "data" not in norm.split(os.sep) or norm in (".", "/"):
-            raise SystemExit(f"refusing to wipe unexpected path: {norm}")
+        # and this guard stands between a typo and an rmtree. The path must be a
+        # *subdirectory* of a data/ directory - "--out data" would otherwise wipe
+        # every dataset in one keystroke.
+        parts = [q for q in norm.split(os.sep) if q not in ("", ".")]
+        if "data" not in parts[:-1] or parts[-1] in ("", ".", "..", "data"):
+            raise SystemExit(
+                f"refusing to wipe {norm!r}: --out must be a subdirectory of a "
+                "data/ directory, e.g. data/night_wildlife")
         shutil.rmtree(norm)
     os.makedirs(norm, exist_ok=True)
 
@@ -319,13 +324,22 @@ if __name__ == "__main__":
     ap.add_argument("--val-fraction", type=float, default=0.15)
     ap.add_argument("--test-fraction", type=float, default=0.15)
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--fill-boxes-yolo", action="store_true",
-                    help="after building, run YOLOv8 to add boxes to frames that "
-                         "lack a ground-truth one (raises crop coverage)")
+    ap.add_argument("--fill-boxes", "--fill-boxes-yolo", dest="fill_boxes",
+                    action="store_true",
+                    help="after building, run the detector (MegaDetector by "
+                         "default) to add boxes to frames that lack a "
+                         "ground-truth one, raising crop coverage")
     args = ap.parse_args()
+    if args.fill_boxes:
+        # Fail before the multi-GB download rather than after it.
+        from src import megadetector as _md
+        if not _md.available():
+            raise SystemExit(
+                '--fill-boxes needs MegaDetector: pip install yolov5 "setuptools<81"'
+                " and run scripts/fetch_megadetector.py")
     build(args.out, args.species, args.per_class, args.per_location_cap,
           args.store_size, args.cache_dir, args.workers,
           args.val_fraction, args.test_fraction, args.seed)
-    if args.fill_boxes_yolo:
+    if args.fill_boxes:
         from fill_boxes_yolo import fill_manifest_boxes
         fill_manifest_boxes(args.out)

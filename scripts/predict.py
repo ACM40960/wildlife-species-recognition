@@ -22,20 +22,25 @@ from src.data import build_transforms, crop_to_box, lookup_bbox  # noqa: E402
 from src.model import build_model  # noqa: E402
 
 
-def _saved_temperature(checkpoint_path):
-    """Read the temperature fitted during evaluation, from metrics.json alongside
-    the checkpoint. Falls back to 1.0 (no calibration) when unavailable."""
+def _saved_calibration(checkpoint_path):
+    """Read (tta, temperature) from the metrics.json written next to the checkpoint.
+
+    Both must come from the SAME evaluation run: the temperature is fitted under a
+    particular TTA setting, so pairing a TTA-fitted temperature with single-view
+    logits would mis-calibrate. Falls back to (False, 1.0) when unavailable.
+    """
     import json
 
     path = os.path.join(os.path.dirname(os.path.abspath(checkpoint_path)),
                         "metrics.json")
     if not os.path.exists(path):
-        return 1.0
+        return False, 1.0
     try:
         with open(path) as fh:
-            return float(json.load(fh).get("temperature", 1.0)) or 1.0
+            m = json.load(fh)
+        return bool(m.get("tta", False)), float(m.get("temperature", 1.0)) or 1.0
     except Exception:
-        return 1.0
+        return False, 1.0
 
 
 def resolve_box(image_path, use_detect, no_crop):
@@ -76,8 +81,8 @@ def main():
     ap.add_argument("--checkpoint", required=True)
     ap.add_argument("--topk", type=int, default=3)
     ap.add_argument("--detect", action="store_true",
-                    help="use YOLOv8 to find the animal when the image has no "
-                         "manifest box")
+                    help="detect the animal when the image has no manifest box "
+                         "(MegaDetector if installed, else YOLOv8)")
     ap.add_argument("--no-calibration", action="store_true",
                     help="skip the fitted temperature and show raw softmax")
     ap.add_argument("--no-crop", action="store_true",
@@ -111,8 +116,10 @@ def main():
     # Match evaluation exactly: same TTA setting, and the temperature that was
     # fitted on the validation split during evaluation (recorded in metrics.json),
     # so a printed confidence means the same thing as the reported ECE.
-    tta = getattr(cfg, "tta", False)
-    temperature = _saved_temperature(args.checkpoint) if not args.no_calibration else 1.0
+    if args.no_calibration:
+        tta, temperature = getattr(cfg, "tta", False), 1.0
+    else:
+        tta, temperature = _saved_calibration(args.checkpoint)
     with torch.no_grad():
         logits = net(x)
         if tta:

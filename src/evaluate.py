@@ -72,10 +72,15 @@ def expected_calibration_error(confidences, correct, n_bins: int = 10) -> float:
     return float(ece)
 
 
-def topk_accuracy(probs, y_true, k: int) -> float:
+def topk_accuracy(probs, y_true, k: int):
+    """Top-k accuracy, or None when k exceeds the number of classes.
+
+    None (JSON null) rather than NaN: bare NaN is not valid JSON and breaks jq,
+    JavaScript and R parsers reading metrics.json.
+    """
     probs, y_true = np.asarray(probs), np.asarray(y_true)
     if len(y_true) == 0 or k > probs.shape[1]:
-        return float("nan")
+        return None
     topk = np.argsort(probs, axis=1)[:, -k:]
     return float(np.mean([yt in row for yt, row in zip(y_true, topk)]))
 
@@ -205,7 +210,7 @@ def _metrics_for(y_true, y_pred, probs, class_names, seed):
         "top2_accuracy": topk_accuracy(probs, y_true, 2),
         "top3_accuracy": topk_accuracy(probs, y_true, 3),
         "expected_calibration_error": expected_calibration_error(conf, correct),
-        "mean_confidence": float(conf.mean()) if conf.size else float("nan"),
+        "mean_confidence": float(conf.mean()) if conf.size else None,
     }
 
 

@@ -37,8 +37,8 @@ animal's bounding box is recorded in the manifest and the **crop is applied at
 load time** (`crop_to_bbox`, `src/data.py`): if a box exists the loader crops to
 it (15% padding); otherwise the whole frame is used. Nothing is baked into the
 files, so the crop strategy (box vs. whole frame) is a runtime choice and the
-originals are preserved. 86% of the committed frames carry a bounding box
-(66% ground-truth, the rest added by the MegaDetector fill step — see §6).
+originals are preserved. 86% of the committed frames carry a bounding box:
+50% ground-truth (598), the rest added by the detector fill step — see §6.
 
 **Split — location-held-out.** Camera-trap frames from the same site share
 backgrounds, so a random split lets the model recognise the *location* instead of
@@ -177,9 +177,9 @@ sharply (0.22 → 0.05), so detection is a genuine part of the pipeline, not an 
 ## 6. Detection stage (YOLOv8)
 
 `src/detect.py` wraps a COCO-pretrained YOLOv8n detector. About half of the CCT
-frames have a ground-truth bounding box; `scripts/fill_boxes_yolo.py` runs the
+frames (598 of 1,200) have a ground-truth bounding box; `scripts/fill_boxes_yolo.py` runs the
 detector over the frames that don't and writes the detected box into the manifest
-(`box_source = gt | megadetector | yolov8 | none`), raising box coverage from 66% to **86%**. The
+(`box_source = gt | megadetector | yolov8 | none`), raising box coverage from 50% to **86%**. The
 detector runs on the already-stored frames, so no re-download is needed, and the
 box is used by the same load-time `crop_to_bbox` path as the ground-truth boxes.
 `scripts/fetch_yolo_weights.py` fetches the weights from a checksum-verified
