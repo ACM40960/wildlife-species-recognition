@@ -74,6 +74,26 @@ def ensure_dir(path: str) -> str:
     return path
 
 
+def load_checkpoint(path: str, map_location="cpu"):
+    """Load a training checkpoint with safe unpickling.
+
+    A PyTorch ``.pt`` file is a pickle, so ``torch.load`` on an untrusted file can
+    execute arbitrary code. We pass ``weights_only=True`` so only tensors and
+    plain data (our ``model_state`` / ``class_names`` / ``config``) are unpickled;
+    a malicious checkpoint cannot run code. Only fall back to the unrestricted
+    loader on older PyTorch that lacks the argument.
+
+    Security note: still only load checkpoints from sources you trust.
+    """
+    import torch
+
+    try:
+        return torch.load(path, map_location=map_location, weights_only=True)
+    except TypeError:
+        # PyTorch too old to support weights_only; the pinned range (>=2.2) has it.
+        return torch.load(path, map_location=map_location)
+
+
 def plot_training_curves(history: dict, out_path: str) -> None:
     """Save train/val loss and accuracy curves to a PNG."""
     import matplotlib

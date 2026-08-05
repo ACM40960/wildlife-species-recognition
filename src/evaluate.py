@@ -23,7 +23,7 @@ import numpy as np
 
 from .data import load_datasets
 from .model import build_model
-from .utils import ensure_dir, set_seed, plot_confusion_matrix
+from .utils import ensure_dir, set_seed, plot_confusion_matrix, load_checkpoint
 
 
 # --------------------------------------------------------------------------- #
@@ -247,7 +247,6 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
     """Score the checkpoint on the unseen-location test set (and seen-location set
     if present). Writes metrics.json, confusion_matrix.png and error_analysis.png.
     """
-    import torch
     from sklearn.metrics import confusion_matrix
 
     set_seed(cfg.seed)
@@ -259,7 +258,7 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
     class_names = datasets.class_names
     n_classes = len(class_names)
 
-    state = torch.load(checkpoint, map_location=device)
+    state = load_checkpoint(checkpoint, map_location=device)   # weights_only=True
     _validate_checkpoint(state, cfg, class_names)   # issues 20 & 21
 
     net = build_model(cfg.backbone, n_classes, pretrained=False, freeze_until="").to(device)

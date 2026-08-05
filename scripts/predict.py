@@ -23,8 +23,9 @@ def main():
 
     import torch
     from PIL import Image
+    from src.utils import load_checkpoint
 
-    state = torch.load(args.checkpoint, map_location="cpu")
+    state = load_checkpoint(args.checkpoint, map_location="cpu")  # weights_only=True
     class_names = state["class_names"]
     saved = state.get("config", {})
     cfg = Config(**{k: v for k, v in saved.items() if k in Config.__dataclass_fields__})
