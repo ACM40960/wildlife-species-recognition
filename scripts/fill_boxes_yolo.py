@@ -77,6 +77,11 @@ def fill_manifest_boxes(data_dir, manifest_name="manifest.csv",
             r["box_source"] = detector
             counts[detector] += 1
         else:
+            # Clear the box too. Leaving a stale bbox with box_source="none" would
+            # make the loader (which reads bbox) crop to a box the manifest says
+            # does not exist, and inflate the reported coverage.
+            r["bbox"] = ""
+            r["has_bbox"] = False
             r["box_source"] = "none"
             counts["none"] += 1
 

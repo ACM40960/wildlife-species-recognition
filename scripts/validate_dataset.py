@@ -10,7 +10,8 @@ Checks, and fails (non-zero exit) on any problem:
   5. split overlap — no image assigned to more than one split;
   6. location overlap — no camera location shared between splits (the whole point
      of the location-held-out split);
-  7. every class appears in every split.
+  7. every class appears in every split;
+  8. manifest self-consistency — has_bbox, bbox and box_source agree.
 
 Usage:
     python scripts/validate_dataset.py --data-dir data/night_wildlife
@@ -128,6 +129,31 @@ def validate(data_dir, manifest_name="manifest.csv", tolerance=0.0):
             _fail(f"class '{cls}' missing from split(s) {missing_splits}", problems)
     if all({"train", "val", "test"} <= s for s in cls_split.values()):
         _ok("every class present in train/val/test")
+
+    # 8. manifest self-consistency: has_bbox <-> bbox <-> box_source must agree,
+    #    otherwise the loader and the reported coverage can disagree.
+    inconsistent = []
+    for r in rows:
+        flag = str(r.get("has_bbox")).lower() == "true"
+        has_coords = bool((r.get("bbox") or "").strip())
+        source = (r.get("box_source") or "").strip()
+        if "box_source" in r:
+            says_box = source not in ("", "none")
+            if flag != has_coords or (source and flag != says_box):
+                inconsistent.append(
+                    f"{r['filename']} (has_bbox={r.get('has_bbox')!r}, "
+                    f"bbox={'set' if has_coords else 'empty'}, box_source={source!r})")
+        elif flag != has_coords:
+            inconsistent.append(r["filename"])
+    if inconsistent:
+        _fail(f"{len(inconsistent)} rows where has_bbox/bbox/box_source disagree "
+              f"(e.g. {inconsistent[:2]})", problems)
+    else:
+        _ok("has_bbox, bbox and box_source agree on every row")
+
+    # Provenance summary (informational): where the boxes actually came from.
+    if rows and "box_source" in rows[0]:
+        _ok(f"box provenance: {dict(Counter(r['box_source'] for r in rows))}")
 
     print()
     if problems:

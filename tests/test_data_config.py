@@ -218,3 +218,40 @@ def test_box_fill_preserves_provenance_on_rerun(tmp_path, monkeypatch):
     assert after["b"] == "yolov8"    # detector box is NOT promoted to gt
     assert after["c"] == "yolov8"    # the boxless row gets detected
     assert counts["gt"] == 1
+
+
+def test_failed_refresh_clears_the_stale_box(tmp_path, monkeypatch):
+    """A re-detection that finds nothing must clear the box, not just relabel it.
+
+    Regression test: the row kept has_bbox=True and its old bbox while box_source
+    became 'none', so the loader (which reads bbox) still cropped to a box the
+    manifest said did not exist.
+    """
+    import csv
+    import importlib.util
+    import sys
+
+    (tmp_path / "x").mkdir()
+    Image.new("L", (64, 64)).save(tmp_path / "x" / "a.jpg")
+    fields = ["class", "filename", "bbox", "has_bbox", "box_source", "image_id"]
+    with open(tmp_path / "manifest.csv", "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=fields)
+        w.writeheader()
+        w.writerow({"class": "x", "filename": "x/a.jpg", "bbox": "5;5;20;20",
+                    "has_bbox": "True", "box_source": "megadetector",
+                    "image_id": "a"})
+
+    spec = importlib.util.spec_from_file_location("fbx2", "scripts/fill_boxes_yolo.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["fbx2"] = mod
+    spec.loader.exec_module(mod)
+    monkeypatch.setattr(mod, "load_detector", lambda w=None: object())
+    monkeypatch.setattr(mod, "yolo_available", lambda: True)
+    monkeypatch.setattr(mod, "best_animal_box", lambda m, p, conf=0.2: None)
+
+    mod.fill_manifest_boxes(str(tmp_path), detector="yolov8", refresh=True)
+
+    row = list(csv.DictReader(open(tmp_path / "manifest.csv")))[0]
+    assert row["bbox"] == ""
+    assert str(row["has_bbox"]).lower() == "false"
+    assert row["box_source"] == "none"
