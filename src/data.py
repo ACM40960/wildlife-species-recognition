@@ -222,35 +222,49 @@ class ManifestDataset:
 def load_datasets(cfg) -> Datasets:
     """Produce train/val/test datasets.
 
-    If ``cfg.split_by == "location"`` and a manifest is present, images are loaded
-    via :class:`ManifestDataset` with the location-grouped split from the manifest
-    (whole camera locations held out — no shared backgrounds) and cropped to the
-    animal box at load time. Otherwise a plain stratified random ImageFolder split
-    is used. Val/test use evaluation transforms; train uses augmentation.
+    Whenever a manifest is present, images are loaded via :class:`ManifestDataset`
+    so the animal crop (``crop_to_bbox``) is applied identically no matter how the
+    data is split. ``split_by="location"`` uses the location-grouped split recorded
+    in the manifest (whole camera sites held out — no shared backgrounds);
+    ``split_by="stratified"`` re-splits the same manifest rows randomly per class,
+    so the two differ only in the split, not in preprocessing. Without a manifest
+    it falls back to a plain ImageFolder stratified split. Val/test use evaluation
+    transforms; train uses augmentation.
     """
-    rows = None
-    if getattr(cfg, "split_by", "location") == "location":
-        rows = read_manifest(cfg.data_dir, getattr(cfg, "manifest_name", "manifest.csv"))
+    rows = read_manifest(cfg.data_dir, getattr(cfg, "manifest_name", "manifest.csv"))
+    split_by = getattr(cfg, "split_by", "location")
 
     train_tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=True)
     eval_tf = build_transforms(cfg.image_size, cfg.grayscale_to_rgb, train=False)
 
     if rows is not None:
-        print("[data] location-grouped split from manifest; crop_to_bbox="
+        print(f"[data] {split_by} split from manifest; crop_to_bbox="
               f"{getattr(cfg, 'crop_to_bbox', True)}")
         class_names = sorted({r["class"] for r in rows})
         class_to_idx = {c: i for i, c in enumerate(class_names)}
         by_split = {"train": [], "val": [], "test": []}
-        for r in rows:
-            if r.get("split") in by_split:
-                by_split[r["split"]].append(r)
+        if split_by == "stratified":
+            # Random per-class split over the same rows, so the location-vs-random
+            # comparison isolates the split (preprocessing stays identical).
+            labels = [class_to_idx[r["class"]] for r in rows]
+            tr, va, te = _stratified_indices(labels, len(class_names),
+                                             cfg.val_fraction, cfg.test_fraction,
+                                             cfg.seed)
+            for name, idxs in (("train", tr), ("val", va), ("test", te)):
+                by_split[name] = [rows[i] for i in idxs]
+        else:
+            for r in rows:
+                if r.get("split") in by_split:
+                    by_split[r["split"]].append(r)
 
         # Carve a SEEN-location test set: hold out a fraction of the train-location
         # images (deterministically, so they are never trained on) to measure
         # accuracy on locations the model HAS seen, alongside the unseen test set.
+        # Only meaningful for a location split: under a stratified split every
+        # location is already "seen", so carving one would just shrink training.
         seen_frac = getattr(cfg, "seen_test_fraction", 0.0)
         seen_rows = []
-        if seen_frac > 0:
+        if seen_frac > 0 and split_by == "location":
             keep, seen_rows = _carve_seen_test(by_split["train"], seen_frac, cfg.seed)
             by_split["train"] = keep
         crop = getattr(cfg, "crop_to_bbox", True)

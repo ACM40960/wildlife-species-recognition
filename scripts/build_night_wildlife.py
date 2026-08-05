@@ -111,8 +111,12 @@ def load_metadata(cache_dir: str):
 def _even_spread(items, k):
     """Pick up to k items evenly spaced across a list (spans the whole range)."""
     n = len(items)
+    if k <= 0 or n == 0:
+        return []
     if n <= k:
         return items
+    if k == 1:
+        return [items[n // 2]]        # a single pick: take the middle of the range
     return [items[round(i * (n - 1) / (k - 1))] for i in range(k)]
 
 
@@ -188,6 +192,18 @@ def fetch(rec, box, store_size):
 def build(out_dir, species_list, per_class, per_location_cap, store_size,
           cache_dir, workers, val_fraction, test_fraction, seed):
     cats, images, img_species, boxes = load_metadata(cache_dir)
+
+    # Validate arguments BEFORE touching the output directory — otherwise a typo in
+    # --species wipes the existing dataset and then dies without rebuilding it.
+    known = set(cats.values())
+    unknown = [s for s in species_list if s not in known]
+    if unknown:
+        raise SystemExit(
+            f"unknown species {unknown}. Available: {sorted(known)}")
+    if per_class < 1:
+        raise SystemExit(f"--per-class must be >= 1 (got {per_class})")
+    if per_location_cap < 1:
+        raise SystemExit(f"--per-location-cap must be >= 1 (got {per_location_cap})")
 
     # Clean rebuild (issue #11): wipe the dataset dir, guarded to a data/ path.
     norm = os.path.normpath(out_dir)

@@ -187,8 +187,9 @@ predictions and errors.
 - The 0.55 is from a **small** dataset (200 images/species) with only six species;
   behaviour on rare species and at larger scale is untested.
 - Bounding boxes cover 66% of the frames (ground-truth + YOLO); the remaining 34%
-  are classified from the whole (letterboxed) frame, so some test images still
-  include background.
+  are classified from the whole frame, which evaluation resizes and centre-crops —
+  so those images keep background and can lose content near the edges. Padding
+  instead of centre-cropping is a known improvement, not yet applied.
 - The YOLO detector is COCO-pretrained, so its infrared boxes are imperfect;
   fine-tuning a detector on camera-trap boxes could raise coverage and quality.
 
