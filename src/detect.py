@@ -39,6 +39,11 @@ def load_detector(weights: str = None):
     Prefers the checksum-verified local weights fetched by
     ``scripts/fetch_yolo_weights.py``; otherwise falls back to ultralytics'
     automatic download (needs internet).
+
+    Security note: a ``.pt`` file is a pickle, so ``YOLO(weights)`` will unpickle
+    whatever ``weights`` points to. Only pass weights you trust — the default and
+    the fetcher both use a SHA-256-verified file. Do not point ``--weights`` at an
+    untrusted or user-supplied path.
     """
     import os
     from ultralytics import YOLO
