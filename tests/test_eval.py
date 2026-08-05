@@ -76,6 +76,53 @@ def test_topk_accuracy_monotonic():
     assert topk_accuracy(probs, [1, 2], 2) == 1.0
 
 
+def test_temperature_scaling_improves_calibration():
+    """A fitted temperature should soften over-confident logits (T > 1)."""
+    torch = pytest.importorskip("torch")
+    from src.evaluate import fit_temperature
+
+    # Deliberately over-confident model: large logits, 30% of them wrong.
+    g = torch.Generator().manual_seed(0)
+    labels = torch.randint(0, 3, (300,), generator=g)
+    logits = torch.zeros(300, 3)
+    logits[torch.arange(300), labels] = 8.0
+    wrong = torch.rand(300, generator=g) < 0.3
+    logits[wrong] = logits[wrong].roll(1, dims=1)
+
+    class Fixed(torch.nn.Module):
+        def forward(self, x):
+            return x
+
+    loader = [(logits, labels)]
+    t = fit_temperature(Fixed(), loader, device="cpu")
+    assert t > 1.0            # over-confident => temperature above 1 softens it
+    assert 0 < t < 100        # and stays in a sane range
+
+
+def test_tta_averages_over_horizontal_flip():
+    """TTA must average the mirrored view, and leave a flip-invariant model alone."""
+    torch = pytest.importorskip("torch")
+    from src.evaluate import _collect
+
+    class FlipSensitive(torch.nn.Module):
+        def forward(self, x):
+            # left half brighter -> class 0, else class 1 (flipping swaps them)
+            left = x[:, :, :, :x.shape[3] // 2].mean(dim=(1, 2, 3))
+            right = x[:, :, :, x.shape[3] // 2:].mean(dim=(1, 2, 3))
+            return torch.stack([left, right], dim=1) * 10
+
+    images = torch.zeros(4, 3, 8, 8)
+    images[:, :, :, :4] = 1.0                      # bright on the left
+    labels = torch.zeros(4, dtype=torch.long)
+    loader = [(images, labels)]
+
+    _, _, p_plain = _collect(FlipSensitive(), loader, "cpu", tta=False)
+    _, _, p_tta = _collect(FlipSensitive(), loader, "cpu", tta=True)
+    # Without TTA the model is confident; with TTA the mirrored view cancels it out.
+    assert p_plain[0].max() > 0.9
+    assert abs(p_tta[0][0] - p_tta[0][1]) < 1e-5
+
+
 def test_ece_perfectly_calibrated_is_low():
     # confidence == accuracy in each region => ECE ~ 0
     conf = np.array([1.0] * 50 + [0.0] * 50)

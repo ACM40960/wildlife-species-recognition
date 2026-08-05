@@ -52,6 +52,10 @@ class Config:
     label_smoothing: float = 0.05
     early_stop_patience: int = 5           # stop if val acc stalls this many epochs
 
+    # --- Evaluation ---
+    tta: bool = True                       # average over the horizontal mirror
+    temperature_scaling: bool = True       # calibrate confidence on the val split
+
     # --- Runtime ---
     seed: int = 42
     deterministic: bool = True             # enable deterministic torch algorithms

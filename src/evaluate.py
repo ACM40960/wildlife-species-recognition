@@ -83,18 +83,69 @@ def topk_accuracy(probs, y_true, k: int) -> float:
 # --------------------------------------------------------------------------- #
 # Prediction collection & checkpoint validation
 # --------------------------------------------------------------------------- #
-def _collect(net, loader, device):
+def _collect(net, loader, device, tta: bool = False, temperature: float = 1.0):
+    """Run the model over a loader and return (y_true, y_pred, probabilities).
+
+    Args:
+        tta: average the softmax over the image and its horizontal mirror. A
+            camera-trap animal is equally likely to face either way, so this is a
+            free, label-preserving ensemble.
+        temperature: divide logits by this before softmax. Fitted on the
+            validation split, it calibrates confidence without changing the
+            ranking (so accuracy is unchanged, ECE improves).
+    """
     import torch
 
     net.eval()
     y_true, y_pred, probs = [], [], []
     with torch.no_grad():
         for images, labels in loader:
-            p = torch.softmax(net(images.to(device)), dim=1).cpu().numpy()
+            images = images.to(device)
+            logits = net(images)
+            if tta:
+                logits = (logits + net(torch.flip(images, dims=[3]))) / 2
+            p = torch.softmax(logits / temperature, dim=1).cpu().numpy()
             probs.append(p)
             y_pred.extend(p.argmax(1).tolist())
             y_true.extend(labels.tolist())
     return y_true, y_pred, (np.concatenate(probs) if probs else np.empty((0, 0)))
+
+
+def fit_temperature(net, loader, device, tta: bool = False) -> float:
+    """Fit a single temperature on held-out data by minimising NLL.
+
+    Standard temperature scaling (Guo et al., 2017): a one-parameter fit that
+    leaves predictions untouched and only rescales confidence.
+    """
+    import torch
+
+    net.eval()
+    logits_all, labels_all = [], []
+    with torch.no_grad():
+        for images, labels in loader:
+            images = images.to(device)
+            logits = net(images)
+            if tta:
+                logits = (logits + net(torch.flip(images, dims=[3]))) / 2
+            logits_all.append(logits.cpu())
+            labels_all.append(labels)
+    if not logits_all:
+        return 1.0
+    logits = torch.cat(logits_all)
+    labels = torch.cat(labels_all)
+
+    log_t = torch.zeros(1, requires_grad=True)     # optimise log T > 0
+    opt = torch.optim.LBFGS([log_t], lr=0.1, max_iter=60)
+    nll = torch.nn.CrossEntropyLoss()
+
+    def closure():
+        opt.zero_grad()
+        loss = nll(logits / log_t.exp(), labels)
+        loss.backward()
+        return loss
+
+    opt.step(closure)
+    return float(log_t.exp().item())
 
 
 def _validate_checkpoint(state, cfg, dataset_class_names):
@@ -273,7 +324,15 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
                   num_workers=safe_num_workers(cfg.num_workers))
     test_loader = DataLoader(datasets.test, shuffle=False, **common)
 
-    y_true, y_pred, probs = _collect(net, test_loader, device)
+    tta = getattr(cfg, "tta", True)
+    # Calibrate on validation (never on test), so the reported ECE is honest.
+    temperature = 1.0
+    if getattr(cfg, "temperature_scaling", True) and len(datasets.val) > 0:
+        val_loader = DataLoader(datasets.val, shuffle=False, **common)
+        temperature = fit_temperature(net, val_loader, device, tta=tta)
+        print(f"[calib] fitted temperature T={temperature:.3f} on the val split")
+
+    y_true, y_pred, probs = _collect(net, test_loader, device, tta, temperature)
     unseen = _metrics_for(y_true, y_pred, probs, class_names, cfg.seed)
     per_class = _per_class(y_true, y_pred, class_names)
 
@@ -285,6 +344,8 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
     metrics = {
         "split_by": getattr(cfg, "split_by", "location"),
         "crop_to_bbox": getattr(cfg, "crop_to_bbox", True),
+        "tta": tta,
+        "temperature": temperature,
         "class_names": class_names,
         "unseen_locations": unseen,       # the honest held-out result
         "per_class": per_class,
@@ -293,7 +354,7 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
     # Seen-location test (issue 23): same model, backgrounds it has seen.
     if datasets.seen_test is not None and len(datasets.seen_test) > 0:
         seen_loader = DataLoader(datasets.seen_test, shuffle=False, **common)
-        st, sp, spr = _collect(net, seen_loader, device)
+        st, sp, spr = _collect(net, seen_loader, device, tta, temperature)
         seen = _metrics_for(st, sp, spr, class_names, cfg.seed)
         metrics["seen_locations"] = seen
         metrics["seen_minus_unseen_accuracy"] = seen["accuracy"] - unseen["accuracy"]
