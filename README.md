@@ -128,10 +128,10 @@ small (233 images), so every number is reported with a 95% confidence interval.
 
 | Locations | What it measures | Accuracy (95% CI) |
 |-----------|------------------|-------------------|
-| **Unseen** (held-out sites) | generalisation to **new cameras** — the honest number | **0.55** (0.49–0.61) |
-| Seen (held-out images from training sites) | performance on familiar backgrounds | 0.76 |
+| **Unseen** (held-out sites) | generalisation to **new cameras** — the honest number | **0.55** (0.48–0.61) |
+| Seen (held-out images from training sites) | performance on familiar backgrounds | 0.72 |
 
-The **+0.21** gap between seen and unseen locations is the key result: even with
+The **+0.17** gap between seen and unseen locations is the key result: even with
 the animal cropped out of the frame, a model still does noticeably better on
 cameras it has seen. Random guessing with 6 classes is 0.17.
 
@@ -139,10 +139,10 @@ Other metrics on the unseen-location test set:
 
 | Metric | Value |
 |--------|-------|
-| Balanced accuracy | 0.55 |
-| Macro-F1 (95% CI) | 0.55 (0.48–0.61) |
-| Top-2 / Top-3 accuracy | 0.68 / 0.78 |
-| Expected calibration error | 0.14 |
+| Balanced accuracy | 0.54 |
+| Macro-F1 (95% CI) | 0.54 (0.48–0.60) |
+| Top-2 / Top-3 accuracy | 0.69 / 0.80 |
+| Expected calibration error | 0.15 |
 
 **Detected-animal vs. full-frame** (issue: does cropping to the animal help?),
 same location split:
@@ -152,11 +152,16 @@ same location split:
 | **Detected animal** (crop to box) | 66% (GT + YOLO) | **0.55** | 0.15 |
 | Full frame | — | 0.46 | 0.22 |
 
-Cropping to the animal lifts unseen-location accuracy by ~9 points and improves
-calibration — evidence the classifier does better when it isn't shown the
-background. Adding the YOLO-detected boxes (raising coverage from 50% to 66%) left
-accuracy unchanged within the confidence interval (0.55 → 0.545): the imperfect
-detector boxes on infrared frames add coverage but little extra signal.
+Cropping to the animal lifts unseen-location accuracy by ~9 points and cuts
+calibration error by about a third (0.22 → 0.15) — evidence the classifier does
+better when it isn't shown the background. Adding the YOLO-detected boxes (raising
+coverage from 50% to 66%) left accuracy unchanged within the confidence interval
+(0.549 → 0.545): the imperfect detector boxes on infrared frames add coverage but
+little extra signal.
+
+> The full-frame row is from a separate run under the same location split; its
+> `results/samelocation` counterpart predates the current metrics schema, so treat
+> the 0.64 same-location figure as indicative rather than exactly comparable.
 
 Per-species, unseen-location test (with 95% CI on recall):
 

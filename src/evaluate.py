@@ -109,7 +109,11 @@ def _validate_checkpoint(state, cfg, dataset_class_names):
             f"  dataset:    {list(dataset_class_names)}\n"
             "Re-evaluate against the dataset the checkpoint was trained on.")
     ck = state.get("config", {}) or {}
-    for field in ("backbone", "image_size", "grayscale_to_rgb"):
+    # crop_to_bbox and split_by matter as much as the architecture: scoring a
+    # crop-trained model on full frames (or against a different split) silently
+    # reports the wrong number rather than failing.
+    for field in ("backbone", "image_size", "grayscale_to_rgb",
+                  "crop_to_bbox", "split_by"):
         if field in ck and getattr(cfg, field) != ck[field]:
             raise ValueError(
                 f"config mismatch on '{field}': checkpoint={ck[field]!r}, "

@@ -37,13 +37,15 @@ animal's bounding box is recorded in the manifest and the **crop is applied at
 load time** (`crop_to_bbox`, `src/data.py`): if a box exists the loader crops to
 it (15% padding); otherwise the whole frame is used. Nothing is baked into the
 files, so the crop strategy (box vs. whole frame) is a runtime choice and the
-originals are preserved. ~50% of the committed frames carry a bounding box.
+originals are preserved. 66% of the committed frames carry a bounding box
+(50% ground-truth, the rest added by the YOLO fill step — see §6).
 
 **Split — location-held-out.** Camera-trap frames from the same site share
 backgrounds, so a random split lets the model recognise the *location* instead of
 the *animal*. `src/split.py` therefore assigns whole camera **locations** to a
-single split (70/15/15 by image count, targeted per species so every species
-appears in every split). No location — and therefore no background — is shared
+single split. Targets are 70/15/15 by image count and are applied per species so
+every species appears in every split; because whole locations move together the
+realised split on the committed data is 61/19/19 (735/232/233). No location — and therefore no background — is shared
 between train, validation and test. The assignment is deterministic given the
 seed and recorded in the manifest; `src/data.py` reads it. A stratified random
 split is still available (`--split-by stratified`) for comparison.
@@ -126,9 +128,9 @@ not only the training-curve plot.
 ## 5. Evaluation
 
 `src/evaluate.py` first **validates the checkpoint** against the current dataset —
-the class names must match exactly (same order) and the backbone, image size and
-grayscale setting must match what the checkpoint was trained with; a mismatch
-raises rather than silently reporting nonsense. It then scores the checkpoint and
+the class names must match exactly (same order) and the backbone, image size,
+grayscale, `crop_to_bbox` and `split_by` settings must match what the checkpoint
+was trained with; a mismatch raises rather than silently reporting nonsense. It then scores the checkpoint and
 writes:
 
 - **Metrics** (`metrics.json`), all with 95% confidence intervals because the
