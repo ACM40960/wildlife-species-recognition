@@ -5,8 +5,8 @@ The model is trained and evaluated on the **animal crop**, so this script applie
 the same crop before classifying — otherwise the model sees a full frame it was
 never trained on and accuracy drops sharply. The box is taken from the dataset
 manifest when the image belongs to a built dataset; for an arbitrary image you can
-pass `--detect` to locate the animal with YOLOv8, or `--no-crop` to force the full
-frame.
+pass `--detect` to locate the animal (MegaDetector when available), or
+`--no-crop` to force the full frame.
 
 Usage:
     python scripts/predict.py --checkpoint results/demo/best_model.pt path/to/image.jpg
@@ -46,13 +46,25 @@ def resolve_box(image_path, use_detect, no_crop):
     if box is not None:
         return box, "dataset manifest box"
     if use_detect:
+        # Prefer MegaDetector: it is what the dataset's boxes were built with, and
+        # a COCO detector has poor recall on infrared frames. Fall back to YOLOv8.
+        try:
+            from src import megadetector as md
+            if md.available():
+                box = md.best_animal_box(md.load_detector(), image_path)
+                if box is not None:
+                    return box, "MegaDetector detection"
+                return None, "full frame (MegaDetector found no animal)"
+        except SystemExit:
+            pass                       # weights missing; try the COCO detector
         from src.detect import load_detector, best_animal_box, yolo_available
         if not yolo_available():
-            print("[warn] --detect needs ultralytics: pip install ultralytics")
-            return None, "full frame (YOLO unavailable)"
+            print('[warn] --detect needs a detector: pip install yolov5 "setuptools<81"'
+                  " (MegaDetector) or ultralytics (YOLOv8)")
+            return None, "full frame (no detector available)"
         box = best_animal_box(load_detector(), image_path)
         if box is not None:
-            return box, "YOLO detection"
+            return box, "YOLOv8 detection (COCO; weak on infrared)"
         return None, "full frame (no animal detected)"
     return None, "full frame (no box in manifest; try --detect)"
 

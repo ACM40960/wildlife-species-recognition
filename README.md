@@ -144,7 +144,7 @@ Other metrics on the unseen-location test set:
 |--------|-------|
 | Balanced accuracy | 0.68 |
 | Macro-F1 (95% CI) | 0.68 (0.62–0.74) |
-| Top-2 / Top-3 accuracy | 0.83 / 0.87 |
+| Top-2 / Top-3 accuracy | 0.83 / 0.89 |
 | Expected calibration error | 0.05 (temperature-scaled, T=1.07) |
 
 **Detected-animal vs. full-frame** (issue: does cropping to the animal help?),
@@ -180,12 +180,12 @@ Per-species, unseen-location test (with 95% CI on recall):
 
 | Species  | Precision | Recall | F1   | Test images |
 |----------|-----------|--------|------|-------------|
-| rabbit   | 0.95      | 0.75   | 0.84 | 51 |
-| deer     | 0.71      | 0.75   | 0.73 | 36 |
-| coyote   | 0.59      | 0.71   | 0.64 | 38 |
-| raccoon  | 0.70      | 0.58   | 0.63 | 33 |
-| bobcat   | 0.59      | 0.66   | 0.62 | 41 |
-| opossum  | 0.58      | 0.62   | 0.60 | 34 |
+| rabbit   | 0.93      | 0.78   | 0.85 | 51 |
+| deer     | 0.72      | 0.78   | 0.75 | 36 |
+| opossum  | 0.70      | 0.62   | 0.66 | 34 |
+| raccoon  | 0.69      | 0.61   | 0.65 | 33 |
+| coyote   | 0.58      | 0.68   | 0.63 | 38 |
+| bobcat   | 0.53      | 0.61   | 0.57 | 41 |
 
 ![training curves](docs/demo_results/training_curves.png)
 ![confusion matrix](docs/demo_results/confusion_matrix.png)
@@ -218,19 +218,20 @@ python scripts/build_night_wildlife.py --out data/night_wildlife \
 
 **Split protocol (read this before quoting a number).** Results are reported on a
 **location-held-out** split: whole camera sites are assigned to train / val / test,
-so test images come from cameras never seen in training. The **0.55** headline is
-this unseen-location accuracy. A same-location (random) split scores higher (0.64)
-but shares backgrounds with training and is reported only for contrast. **We do
-not claim the model generalises broadly** — it is trained on 6 species and 1,200
-low-resolution frames, and 0.55 is the measured accuracy on *these* unseen
+so test images come from cameras never seen in training. The **0.69** headline is
+this unseen-location accuracy. A same-location (random) split scores higher but
+shares backgrounds with training and is reported only for contrast. **We do not
+claim the model generalises broadly** — it is trained on 6 species and 1,200
+low-resolution frames, and 0.69 is the measured accuracy on *these* unseen
 Caltech Camera Traps sites, not a claim about other datasets, regions, or species.
 
-> **Caveat on the 0.55 vs 0.64 gap.** The location-held-out run also holds out a
-> *seen-location* slice from training (`seen_test_fraction`, for the seen-vs-unseen
-> comparison), so it trains on fewer images (~625) than the same-location run
-> (~840). Part of the 0.55→0.64 difference is therefore this training-set-size
-> difference, not only the split. The **seen-vs-unseen** comparison below is the
-> clean one, because it uses a single model evaluated on both.
+> **Caveat on the location-vs-random comparison.** The location-held-out run also
+> holds out a *seen-location* slice from training (`seen_test_fraction`, for the
+> seen-vs-unseen comparison), so it trains on ~625 images against the
+> same-location run's ~840. Any location-vs-random gap therefore mixes in a
+> training-set-size difference. The **seen-vs-unseen** comparison above is the
+> clean one: a single model evaluated on both. (The same-location figure quoted
+> earlier predates the current pipeline and has not been re-run.)
 
 Exact commands (CPU; seed 42; each writes `metrics.json` + plots):
 
@@ -254,7 +255,7 @@ Tested dependency versions (ranges in `requirements.txt`; Python 3.11):
 | Package | Tested |
 |---------|--------|
 | torch / torchvision | 2.13 / 0.28 |
-| numpy | 2.4 |
+| numpy | 2.3.5 |
 | scikit-learn | 1.9 |
 | matplotlib | 3.11 |
 | Pillow | 12.3 |

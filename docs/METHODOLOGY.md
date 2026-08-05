@@ -45,15 +45,15 @@ backgrounds, so a random split lets the model recognise the *location* instead o
 the *animal*. `src/split.py` therefore assigns whole camera **locations** to a
 single split. Targets are 70/15/15 by image count and are applied per species so
 every species appears in every split; because whole locations move together the
-realised split on the committed data is 61/19/19 (735/232/233). No location — and therefore no background — is shared
-between train, validation and test. The assignment is deterministic given the
+realised split on the committed data is 61/19/19 (735/232/233). No location — and
+therefore no background — is shared between train, validation and test. The assignment is deterministic given the
 seed and recorded in the manifest; `src/data.py` reads it. A stratified random
 split is still available (`--split-by stratified`) for comparison.
 
 Note that the location-held-out run additionally holds out a *seen-location* slice
 from training (`seen_test_fraction`, §5), so it trains on fewer images (~625) than
-the stratified run (~840). When comparing the location-held-out (0.55) and
-same-location (0.64) numbers, part of the difference is this training-set-size
+the stratified run (~840). When comparing the location-held-out (0.69) and
+same-location numbers, part of any difference is this training-set-size
 difference, not only the split — so the seen-vs-unseen comparison (§5), which uses
 one model on both, is the cleaner measure of the generalisation gap.
 
@@ -73,10 +73,10 @@ Infrared frames are single-channel. Because the backbone was pretrained on
 (`--grayscale`, on by default) and normalise with ImageNet statistics
 (mean `[0.485, 0.456, 0.406]`, std `[0.229, 0.224, 0.225]`).
 
-- **Training transforms:** `RandomResizedCrop(224, scale=0.7–1.0)`, horizontal
-  flip, `RandomRotation(±10°)`, and colour jitter (brightness ±0.2, contrast
-  ±0.2). These mimic the pose, framing, and brightness variation of real camera
-  traps.
+- **Training transforms:** letterbox, then `RandomResizedCrop(224,
+  scale=0.8–1.0)`, horizontal flip, `RandomRotation(±10°)`, and colour jitter
+  (brightness ±0.2, contrast ±0.2). These mimic the pose, framing, and brightness
+  variation of real camera traps.
 - **Letterbox padding:** frames are resized preserving aspect ratio and padded to
   a square rather than centre-cropped. A centre crop of a 4:3 frame discarded ~35%
   of its width and could remove the animal entirely.
@@ -170,16 +170,16 @@ context only.
 **Detected-animal vs. full-frame.** Because the crop is applied at load time
 (`crop_to_bbox`), the same split can be trained and evaluated with the animal
 cropped or on the full frame just by toggling `--crop-to-bbox` / `--no-crop-to-bbox`.
-Cropping to the animal (using the dataset bounding boxes as the detector) improves
-unseen-location accuracy from 0.46 to 0.55 and roughly halves the calibration
-error, so detection is a genuine part of the pipeline, not an afterthought.
+Cropping to the animal (using the dataset/MegaDetector boxes) improves
+unseen-location accuracy from 0.46 to 0.69 and cuts the calibration error
+sharply (0.22 → 0.05), so detection is a genuine part of the pipeline, not an afterthought.
 
 ## 6. Detection stage (YOLOv8)
 
 `src/detect.py` wraps a COCO-pretrained YOLOv8n detector. About half of the CCT
 frames have a ground-truth bounding box; `scripts/fill_boxes_yolo.py` runs the
 detector over the frames that don't and writes the detected box into the manifest
-(`box_source = gt | yolo | none`), raising box coverage from 50% to **66%**. The
+(`box_source = gt | megadetector | yolov8 | none`), raising box coverage from 66% to **86%**. The
 detector runs on the already-stored frames, so no re-download is needed, and the
 box is used by the same load-time `crop_to_bbox` path as the ground-truth boxes.
 `scripts/fetch_yolo_weights.py` fetches the weights from a checksum-verified

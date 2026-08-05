@@ -323,6 +323,12 @@ def load_datasets(cfg) -> Datasets:
         if seen_frac > 0 and split_by == "location":
             keep, seen_rows = _carve_seen_test(by_split["train"], seen_frac, cfg.seed)
             by_split["train"] = keep
+        if not by_split["train"] or not by_split["test"]:
+            raise ValueError(
+                f"manifest at {cfg.data_dir} produced an empty train or test split "
+                f"(train={len(by_split['train'])}, val={len(by_split['val'])}, "
+                f"test={len(by_split['test'])}). Does it have a 'split' column with "
+                "train/val/test values? Rebuild it with scripts/build_night_wildlife.py.")
         crop = getattr(cfg, "crop_to_bbox", True)
 
         def ds(split_rows, tf):

@@ -25,6 +25,13 @@ def main():
                     help="dir containing config.json and the checkpoint")
     ap.add_argument("--checkpoint", default=None)
     ap.add_argument("--device", default=None, choices=["auto", "cpu", "cuda"])
+    ap.add_argument("--tta", dest="tta", action="store_true", default=None,
+                    help="average over the horizontal mirror (measured slightly "
+                         "worse on this data; off by default)")
+    ap.add_argument("--no-tta", dest="tta", action="store_false")
+    ap.add_argument("--no-temperature-scaling", dest="temperature_scaling",
+                    action="store_false", default=None,
+                    help="report raw (uncalibrated) confidences")
     args = ap.parse_args()
 
     cfg_path = os.path.join(args.output_dir, "config.json")
@@ -35,6 +42,10 @@ def main():
     cfg.output_dir = args.output_dir
     if args.device is not None:
         cfg.device = args.device
+    for key in ("tta", "temperature_scaling"):
+        val = getattr(args, key, None)
+        if val is not None:
+            setattr(cfg, key, val)
 
     evaluate(cfg, checkpoint=args.checkpoint)
 

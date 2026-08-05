@@ -235,7 +235,7 @@ def _save_error_examples(dataset, y_true, y_pred, probs, class_names, out_path,
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from PIL import Image
-    from .data import _parse_bbox
+    from .data import _parse_bbox, crop_to_box
 
     rows = getattr(dataset, "rows", None)
     if rows is None:
@@ -256,11 +256,9 @@ def _save_error_examples(dataset, y_true, y_pred, probs, class_names, out_path,
         r = rows[i]
         img = Image.open(os.path.join(dataset.data_dir, r["filename"])).convert("L")
         box = _parse_bbox(r.get("bbox", "")) if dataset.crop_to_bbox else None
-        if box:
-            x, y, w, h = box
-            W, H = img.size
-            img = img.crop((max(0, x), max(0, y), min(W, x + w), min(H, y + h)))
-        return img
+        # Same padded crop the model was actually shown (BBOX_PAD), so the montage
+        # reflects the input, not a tighter box.
+        return crop_to_box(img, box, dataset.bbox_pad)
 
     cols = max_each
     rows_n = 2

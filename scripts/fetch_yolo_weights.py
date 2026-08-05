@@ -6,8 +6,11 @@ time a YOLO model is created. This helper exists for environments where the
 ultralytics asset host is blocked (as in the sandbox this repo was built in): it
 pulls the *identical* weights from a checksum-verified Git-LFS mirror on GitHub.
 
-The download is verified against the file's LFS object SHA-256, so you are
-getting the genuine COCO-pretrained YOLOv8n, not an arbitrary file.
+The download is pinned to a SHA-256 recorded when this mirror was first fetched,
+so the file cannot change underneath you. Note this pins *that* file - it is a
+third-party mirror, not an official Ultralytics release, and the .pt is unpickled
+on load. Prefer letting ultralytics download the official weights when your
+network allows it.
 
 Usage:
     python scripts/fetch_yolo_weights.py                 # -> .cct_cache/yolov8n.pt

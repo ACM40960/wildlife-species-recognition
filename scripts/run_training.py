@@ -47,6 +47,20 @@ def build_config() -> Config:
                     help="crop to the detected animal box (default)")
     ap.add_argument("--no-crop-to-bbox", dest="crop_to_bbox", action="store_false",
                     help="use the full frame (for the full-vs-detected comparison)")
+    ap.add_argument("--pad-to-square", dest="pad_to_square", action="store_true",
+                    default=None, help="letterbox-pad instead of centre-crop (default)")
+    ap.add_argument("--no-pad-to-square", dest="pad_to_square", action="store_false",
+                    help="centre-crop instead of padding (discards frame edges)")
+    ap.add_argument("--ir-augment", dest="ir_augment", action="store_true", default=None,
+                    help="infrared-specific augmentation (default)")
+    ap.add_argument("--no-ir-augment", dest="ir_augment", action="store_false",
+                    help="disable gamma/erasing augmentation")
+    ap.add_argument("--seen-test-fraction", dest="seen_test_fraction", type=float,
+                    default=None,
+                    help="fraction of training-location images held out to measure "
+                         "seen-location accuracy (0 to train on all of them)")
+    ap.add_argument("--val-fraction", dest="val_fraction", type=float, default=None)
+    ap.add_argument("--test-fraction", dest="test_fraction", type=float, default=None)
     ap.add_argument("--num-workers", dest="num_workers", type=int, default=None,
                     help="DataLoader workers (default 0). Workers use /dev/shm, "
                          "which is tiny in Docker/Codespaces; raise only if yours "
@@ -59,8 +73,9 @@ def build_config() -> Config:
     cfg = Config()
     for key in ("data_dir", "backbone", "epochs", "batch_size", "learning_rate",
                 "image_size", "freeze_until", "pretrained", "grayscale_to_rgb",
-                "split_by", "crop_to_bbox", "num_workers", "output_dir",
-                "device", "seed"):
+                "split_by", "crop_to_bbox", "pad_to_square", "ir_augment",
+                "seen_test_fraction", "val_fraction", "test_fraction",
+                "num_workers", "output_dir", "device", "seed"):
         val = getattr(args, key, None)
         if val is not None:
             setattr(cfg, key, val)

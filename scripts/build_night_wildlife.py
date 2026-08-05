@@ -208,8 +208,10 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
     # Clean rebuild (issue #11): wipe the dataset dir, guarded to a data/ path.
     norm = os.path.normpath(out_dir)
     if os.path.exists(norm):
-        assert "data" in norm.split(os.sep) and norm not in (".", "/"), \
-            f"refusing to wipe unexpected path: {norm}"
+        # An explicit raise, not assert: asserts are stripped under `python -O`,
+        # and this guard stands between a typo and an rmtree.
+        if "data" not in norm.split(os.sep) or norm in (".", "/"):
+            raise SystemExit(f"refusing to wipe unexpected path: {norm}")
         shutil.rmtree(norm)
     os.makedirs(norm, exist_ok=True)
 

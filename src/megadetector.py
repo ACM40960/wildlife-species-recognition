@@ -81,8 +81,12 @@ def best_animal_box(model, image, conf: float = 0.2, iou: float = 0.45):
     h0, w0 = im0.shape[:2]
 
     padded, ratio, (dw, dh) = letterbox(im0, INPUT_SIZE, stride=32, auto=False)
+    # yolov5's reference code does transpose(...)[::-1] because it reads frames
+    # with cv2 (BGR) and the model wants RGB. We already hold RGB from PIL, so the
+    # reversal must NOT be applied - doing so would feed BGR. (Harmless on the
+    # grayscale IR frames used here, where R==G==B, but wrong for colour input.)
     x = torch.from_numpy(
-        np.ascontiguousarray(padded.transpose(2, 0, 1)[::-1])).float().unsqueeze(0) / 255
+        np.ascontiguousarray(padded.transpose(2, 0, 1))).float().unsqueeze(0) / 255
     with torch.no_grad():
         pred = model(x)[0]
     det = non_max_suppression(pred, conf, iou)[0]
@@ -93,7 +97,6 @@ def best_animal_box(model, image, conf: float = 0.2, iou: float = 0.45):
     for *xyxy, score, cls in det.tolist():
         if int(cls) != ANIMAL_CLASS or score <= best_conf:
             continue
-        best_conf = score
         x1, y1, x2, y2 = xyxy
         # undo letterbox padding and scaling
         x1 = (x1 - dw) / ratio[0]
@@ -102,6 +105,9 @@ def best_animal_box(model, image, conf: float = 0.2, iou: float = 0.45):
         y2 = (y2 - dh) / ratio[1]
         x1, y1 = max(0.0, x1), max(0.0, y1)
         x2, y2 = min(float(w0), x2), min(float(h0), y2)
+        # Only accept (and only then raise best_conf) once the box survives
+        # clipping - otherwise a degenerate top box would suppress valid ones.
         if x2 - x1 > 1 and y2 - y1 > 1:
+            best_conf = score
             best = (int(x1), int(y1), int(x2 - x1), int(y2 - y1))
     return best
