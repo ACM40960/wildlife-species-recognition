@@ -1,0 +1,29 @@
+# Conda environment for this project.
+#
+#   conda env create -f environment.yml
+#   conda activate night-wildlife
+#
+# Everything needed to train, evaluate and predict. The detector packages used to
+# (re)build the dataset's bounding boxes are optional and commented out at the
+# bottom — the committed dataset already carries its boxes in the manifest.
+name: night-wildlife
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pytorch>=2.2,<3          # tested: 2.13
+  - torchvision>=0.17,<1     # tested: 0.28
+  - cpuonly                  # drop this line to install a CUDA build
+  - numpy>=1.24,<3           # tested: 2.3.5
+  - pillow>=9.5,<13          # tested: 12.3
+  - scikit-learn>=1.3,<2     # tested: 1.9
+  - matplotlib>=3.7,<4       # tested: 3.11
+  - pip
+  - pip:
+      - pytest>=7.4,<10      # tests
+      - flake8>=6.0,<8       # lint
+      # Optional — only to re-run the bounding-box detection step:
+      # - yolov5>=7.0,<8     # MegaDetector weights are a YOLOv5 checkpoint
+      # - setuptools<81      # yolov5 still imports pkg_resources
+      # - ultralytics>=8.0,<9  # alternative COCO detector (--detector yolov8)
