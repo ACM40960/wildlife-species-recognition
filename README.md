@@ -1,33 +1,40 @@
 # Night-Vision Wildlife Species Recognition
 
-**Identifying animal species in infrared camera-trap images**
-ACM 40960 — Project 9 · University College Dublin, Summer 2026
+Identifying animal species in infrared camera-trap photos.
 
-Camera traps photograph millions of animals a year, and after dark they switch to
-an infrared flash: grayscale, low-contrast frames that models trained on ordinary
-daytime photos handle poorly. This project trains a convolutional neural network
-to identify six species in those night-time frames, and — crucially — measures how
-well it works on **camera sites it has never seen**.
+ACM 40960 Project 9, University College Dublin, Summer 2026
+Srivani Konda and Navya Sri Mungamuri
 
-**Headline result: 0.687 accuracy (95% CI 0.625–0.743), macro AUC 0.891**, on
-held-out camera locations. Random guessing would be 0.167.
+Camera traps take millions of photos of wild animals every year. After dark they
+switch to an infrared flash, which produces grey, low-contrast images. Models
+trained on normal daytime photos tend to do badly on these. We trained a CNN to
+recognise six species in night-time infrared frames, and tested it on camera sites
+it had never seen during training.
+
+Our best model gets **68.7% accuracy** (95% CI 62.5-74.3) and a macro AUC of
+**0.891** on those unseen cameras. With six species, random guessing would be
+16.7%.
 
 ![confusion matrix](docs/demo_results/confusion_matrix.png)
 ![ROC curves](docs/demo_results/roc_curves.png)
-
----
 
 ## Quick start
 
 ```bash
 conda env create -f environment.yml && conda activate night-wildlife
-# or: pip install -r requirements.txt
+# or, if you prefer pip:  pip install -r requirements.txt
+```
 
+Then train, evaluate and predict:
+
+```bash
 python scripts/run_training.py   --data-dir data/night_wildlife --output-dir results/demo --device cpu
 python scripts/run_evaluation.py --output-dir results/demo --device cpu
 python scripts/predict.py data/night_wildlife/bobcat/bobcat_0032.jpg \
     --checkpoint results/demo/best_model.pt
 ```
+
+The prediction script prints the top classes and their probabilities:
 
 ```
 Predictions for data/night_wildlife/bobcat/bobcat_0032.jpg  [input: dataset manifest box, T=1.07]
@@ -36,36 +43,35 @@ Predictions for data/night_wildlife/bobcat/bobcat_0032.jpg  [input: dataset mani
   3. raccoon              0.015
 ```
 
-Training takes ~15 min on a laptop CPU. Everything needed is in the repo — the
-dataset ships with it.
+Training takes about 15 minutes on a laptop CPU. The dataset is included in the
+repo, so nothing else needs downloading.
 
-> **In a container (Codespaces/Docker)?** Data loading runs in-process by default
-> because containers mount a tiny `/dev/shm`. If yours is large, add
-> `--num-workers 2`.
-
----
+If you are running inside Codespaces or Docker, data loading stays in one process
+by default, because containers usually give you a very small `/dev/shm`. If yours
+is large you can speed things up with `--num-workers 2`.
 
 ## Results
 
-Evaluated on **233 images from camera locations excluded from training**. All
-metrics are macro-averaged (each species counts equally) and reported with 95%
-confidence intervals, because the test set is small.
+We tested on 233 images taken at camera locations that were left out of training.
+All the averages below are macro averages, so every species counts equally, and we
+give 95% confidence intervals because the test set is fairly small.
 
 | Metric | Value |
 |--------|-------|
-| **Accuracy** | **0.687** (0.625 – 0.743) |
+| Accuracy | 0.687 (0.625 - 0.743) |
 | Balanced accuracy | 0.680 |
 | Precision (macro) | 0.691 |
 | Recall (macro) | 0.680 |
-| **F1 (macro)** | **0.682** (0.623 – 0.740) |
-| **AUC (macro, one-vs-rest)** | **0.891** |
+| F1 (macro) | 0.682 (0.623 - 0.740) |
+| AUC (macro, one-vs-rest) | 0.891 |
 | Top-2 accuracy | 0.828 |
 | Expected calibration error | 0.048 |
 
-The AUC of 0.891 says the model *ranks* species well even where its top-1 choice
-is wrong — the confusions are between genuinely similar animals, not random.
+The AUC being much higher than the accuracy tells us something useful. Even when
+the model's first guess is wrong, it usually still ranks the correct species near
+the top, so the mistakes are not random.
 
-**Per species:**
+Per species:
 
 | Species | Precision | Recall | F1 | Test images |
 |---------|-----------|--------|-----|-------------|
@@ -76,100 +82,104 @@ is wrong — the confusions are between genuinely similar animals, not random.
 | coyote | 0.58 | 0.68 | 0.63 | 38 |
 | bobcat | 0.53 | 0.61 | 0.57 | 41 |
 
-Rabbit and deer are easiest — distinctive silhouettes. Bobcat and coyote are
-hardest and are mostly confused with *each other*: similar-sized four-legged
-carnivores, which in a grayscale infrared frame look much alike.
+Rabbits and deer are the easiest, which makes sense as their body shapes are quite
+distinctive. Bobcat and coyote are the hardest, and looking at the confusion matrix
+they are mostly getting mixed up with each other. Both are four-legged carnivores
+of a similar size, and in a grey infrared image they really do look alike.
 
-### The key finding: seen vs. unseen cameras
+### Seen vs unseen cameras
 
-The same model, evaluated on both:
+This is the part we think is most interesting. We took the same model and scored it
+two ways:
 
 | Camera locations | Accuracy |
 |------------------|----------|
-| **Unseen** (never trained on) | **0.687** |
-| Seen (held-out images, familiar backgrounds) | 0.800 |
+| Unseen (not trained on at all) | 0.687 |
+| Seen (held-out photos from training cameras) | 0.800 |
 
-The **+0.11 gap** is the scientifically interesting result. Camera-trap frames from
-one site share a background, so a model can learn the *place* instead of the
-*animal*. Splitting by location — and cropping to the detected animal — is what
-makes the 0.687 an honest measure of species recognition. Reported on a random
-split instead, the same pipeline would look better than it is.
+There is an 11 point drop when the cameras are new to the model. Photos from one
+camera all share the same background, so a model can quietly learn to recognise the
+*place* rather than the *animal*. Splitting the data by location, and cropping to
+the animal before classifying, is what stops that from inflating our result. If we
+had used an ordinary random split we would have reported a better looking number
+that did not mean as much.
 
 ![training curves](docs/demo_results/training_curves.png)
 
----
+## How it works
 
-## Method in brief
+The short version: take the infrared frame, crop to the animal, and feed it to a
+ResNet-18 that was pretrained on ImageNet, with the later layers retrained on our
+data.
 
-Infrared frames → crop to the animal → ImageNet-pretrained **ResNet-18** with the
-later layers retrained → six-way classification.
+| Stage | What we did |
+|-------|-------------|
+| Data | 1,200 night infrared photos, 6 species with 200 each, from Caltech Camera Traps |
+| Boxes | 86% of photos have an animal box (half from the dataset itself, the rest found by MegaDetector) |
+| Split | By camera location, so a whole site goes to train or val or test, never split across them |
+| Preprocessing | Crop to the animal box, pad to a square so nothing is cut off, infrared-specific augmentation |
+| Model | ResNet-18 with ImageNet weights, retraining `layer3`, `layer4` and the classifier head |
+| Training | AdamW at 3e-4, cosine schedule, class weighting, early stopping, 16 epochs |
+| Evaluation | Confusion matrix, ROC and AUC, macro precision/recall/F1, calibration, seen vs unseen |
 
-| Stage | Choice |
-|-------|--------|
-| Data | 1,200 night infrared frames, 6 species × 200, from Caltech Camera Traps |
-| Boxes | 86% of frames have an animal box (50% dataset ground truth, rest from MegaDetector) |
-| Split | **Location-held-out** — whole camera sites go to train *or* val *or* test |
-| Preprocessing | Crop to animal box; letterbox pad (nothing cut off); infrared augmentation |
-| Model | ResNet-18, ImageNet weights, `layer3`/`layer4`/head retrained |
-| Training | AdamW 3e-4, cosine schedule, class weighting, early stopping, 16 epochs |
-| Evaluation | Confusion matrix, ROC/AUC, macro P/R/F1, calibration, seen-vs-unseen |
+All the settings and the reasoning behind them are in
+[docs/METHODOLOGY.md](docs/METHODOLOGY.md).
 
-**Full detail is in [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)** — every setting,
-why it was chosen, and what each change was worth.
-
-What moved the number, measured one change at a time
-([run log](docs/experiments.md)):
+We changed one thing at a time and kept a log of what each change was worth:
 
 | Change | Accuracy |
 |--------|----------|
-| Baseline | 0.55 |
-| + letterbox padding & infrared augmentation | 0.61 |
-| + MegaDetector boxes | **0.69** |
+| Starting point | 0.55 |
+| Padding instead of cropping, plus infrared augmentation | 0.61 |
+| Better animal boxes from MegaDetector | 0.69 |
 
-Two things we tried that did **not** help are recorded there too — test-time
-augmentation was slightly worse, and temperature scaling improves calibration
-without touching accuracy.
+Two things we tried did not help, and we left them in the log rather than quietly
+dropping them. Test-time augmentation came out slightly worse, and temperature
+scaling improved how well-calibrated the probabilities are without changing the
+accuracy at all.
 
----
-
-## Repository
+## What is in the repo
 
 ```
-src/        config · data loading · location split · model · training · evaluation · detection
-scripts/    build the dataset · validate it · train · evaluate · predict
-docs/       methodology · literature review · experiment log · results
-data/       the infrared dataset + manifest.csv (provenance & checksums)
-tests/      39 tests — run with `pytest`
+src/        config, data loading, location split, model, training, evaluation, detection
+scripts/    build the dataset, validate it, train, evaluate, predict
+docs/       methodology, literature review, experiment log, saved results
+data/       the infrared dataset and manifest.csv
+tests/      39 tests, run them with pytest
 ```
 
-- [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) — the full pipeline
-- [`docs/literature_review.md`](docs/literature_review.md) — background and prior work
-- [`docs/experiments.md`](docs/experiments.md) — every run and what it changed
-- [`docs/DATA_LICENSE.md`](docs/DATA_LICENSE.md) — data licensing and attribution
+- [docs/METHODOLOGY.md](docs/METHODOLOGY.md) for the full pipeline
+- [docs/literature_review.md](docs/literature_review.md) for background reading
+- [docs/experiments.md](docs/experiments.md) for every run we did
+- [docs/DATA_LICENSE.md](docs/DATA_LICENSE.md) for data licensing and attribution
 
-**Reproducing:** every run is seeded and writes `config.json`, `environment.json`
-and a full per-epoch `history.csv` beside its checkpoint. `pytest` covers the
-split logic, preprocessing, metrics and an end-to-end training smoke test.
-`python scripts/validate_dataset.py` checks the dataset before you train.
+Every run is seeded and saves its `config.json`, `environment.json` and a
+per-epoch `history.csv` next to the checkpoint, so results can be reproduced.
+Running `python scripts/validate_dataset.py` checks the dataset before training.
 
 ## Limitations
 
-- 6 species and 1,200 images. 0.687 is the accuracy on *these* unseen Caltech
-  Camera Traps sites — not a claim about other regions, datasets or species.
-- 14% of frames have no animal box and are classified from the whole frame.
-- Single model, single seed; no cross-validation over multiple location splits.
+- Only 6 species and 1,200 photos. The 68.7% applies to these unseen Caltech
+  Camera Traps sites, and we are not claiming it would hold for other regions or
+  other species.
+- 14% of the photos have no animal box, so those get classified from the whole
+  frame with the background still in it.
+- One model and one seed. We did not cross-validate across several different
+  location splits, which would give a better idea of the uncertainty.
 
 ## Contributors
 
 | Name | Student number | Main responsibility |
 |------|----------------|---------------------|
-| Srivani Konda ([@srivanik8](https://github.com/srivanik8)) | 25211398 | Data pipeline — dataset builder, preprocessing, splits |
+| Srivani Konda ([@srivanik8](https://github.com/srivanik8)) | 25211398 | Data pipeline: dataset builder, preprocessing, splits |
 | Navya Sri Mungamuri | 25200230 | Model, training, evaluation, results |
 
 ## Licence and credit
 
-Code: **MIT** ([`LICENSE`](LICENSE)). Data: Caltech Camera Traps — Beery, Van Horn
-& Perona, *Recognition in Terra Incognita*, ECCV 2018, via
-[LILA BC](https://lila.science/datasets/caltech-camera-traps) under
-CDLA-Permissive. Attribution and what is redistributed:
-[`docs/DATA_LICENSE.md`](docs/DATA_LICENSE.md).
+Our code is MIT licensed, see [LICENSE](LICENSE).
+
+The photos come from the Caltech Camera Traps dataset (Beery, Van Horn and Perona,
+*Recognition in Terra Incognita*, ECCV 2018), obtained through
+[LILA BC](https://lila.science/datasets/caltech-camera-traps) under the
+CDLA-Permissive licence. Details of what we redistribute are in
+[docs/DATA_LICENSE.md](docs/DATA_LICENSE.md).
