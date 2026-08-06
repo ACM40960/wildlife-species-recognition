@@ -37,6 +37,40 @@ def test_validate_checkpoint_requires_class_names():
         _validate_checkpoint({"config": {}}, Config(), ["a"])
 
 
+def test_validate_checkpoint_rejects_seen_holdout_mismatch():
+    """A different seed/holdout means the 'seen' split contains TRAINING images.
+
+    The seen-location set is re-carved at evaluation time from cfg.seed and
+    cfg.seen_test_fraction. Scoring a checkpoint trained with different values
+    reports accuracy on images the model was trained on, so it must fail loudly.
+    """
+    cfg = Config()
+    cfg.seed = 7
+    with pytest.raises(ValueError):
+        _validate_checkpoint(_state(["a", "b"], seed=42), cfg, ["a", "b"])
+
+    cfg = Config()
+    cfg.seen_test_fraction = 0.0
+    with pytest.raises(ValueError):
+        _validate_checkpoint(_state(["a", "b"], seen_test_fraction=0.15),
+                             cfg, ["a", "b"])
+
+
+def test_validate_checkpoint_checks_split_fractions_only_when_stratified():
+    """val/test fractions define the split under --split-by stratified only."""
+    strat = Config()
+    strat.split_by = "stratified"
+    with pytest.raises(ValueError):
+        _validate_checkpoint(_state(["a", "b"], split_by="stratified",
+                                    test_fraction=0.30), strat, ["a", "b"])
+
+    # Under the location split they come from the manifest and are ignored, so a
+    # difference must not block evaluation.
+    loc = Config()
+    _validate_checkpoint(_state(["a", "b"], split_by="location",
+                                test_fraction=0.30), loc, ["a", "b"])
+
+
 # ----- statistics (issue 22 & 23) -----
 def test_wilson_ci_brackets_point_estimate():
     lo, hi = wilson_ci(8, 10)

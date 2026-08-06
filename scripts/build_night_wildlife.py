@@ -341,5 +341,9 @@ if __name__ == "__main__":
           args.store_size, args.cache_dir, args.workers,
           args.val_fraction, args.test_fraction, args.seed)
     if args.fill_boxes:
+        # scripts/ is sys.path[0] when this file is run directly, but not under
+        # `python -m scripts.build_night_wildlife`. Add it explicitly so the
+        # import cannot fail *after* the multi-GB download has already run.
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from fill_boxes_yolo import fill_manifest_boxes
         fill_manifest_boxes(args.out)

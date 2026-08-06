@@ -63,8 +63,9 @@ filename, source CCT image id, original filename, camera location, sequence id,
 timestamp, month, season, bounding box, whether a box exists, and a SHA-256
 checksum. It also writes `build_report.txt` logging every rejected/failed
 download with its id and reason. `scripts/validate_dataset.py` then checks class
-balance, file integrity (checksums + openability), split/location overlap, and
-manifest↔file consistency — run it before training.
+balance, file integrity (checksums + openability), split/location overlap,
+manifest↔file consistency, and manifest self-consistency (`has_bbox`, `bbox` and
+`box_source` must agree on every row) — run it before training.
 
 ## 2. Preprocessing and augmentation
 
@@ -134,19 +135,27 @@ not only the training-curve plot.
 ## 5. Evaluation
 
 `src/evaluate.py` first **validates the checkpoint** against the current dataset —
-the class names must match exactly (same order) and the backbone, image size,
-grayscale, `crop_to_bbox` and `split_by` settings must match what the checkpoint
-was trained with; a mismatch raises rather than silently reporting nonsense. It then scores the checkpoint and
-writes:
+the class names must match exactly (same order) and every setting that decides
+which pixels the model sees or which images it was trained on — backbone, image
+size, grayscale, `crop_to_bbox`, `pad_to_square`, `split_by`, `seed`,
+`seen_test_fraction`, and (under the stratified split) the val/test fractions —
+must match what the checkpoint was trained with; a mismatch raises rather than
+silently reporting nonsense. It then scores the checkpoint and writes:
 
 - **Metrics** (`metrics.json`), all with 95% confidence intervals because the
   test set is small (~30/species):
   - accuracy with a **Wilson** interval;
-  - **test-time augmentation**: the softmax is averaged over the frame and its
-    horizontal mirror (an animal faces either way with equal probability);
-  - **temperature scaling**: one temperature is fitted on the *validation* split
-    (never on test) and applied to the logits. It leaves predictions and accuracy
-    untouched and only makes the confidences honest — ECE fell 0.15 → 0.07.
+  - **temperature scaling** (on by default): one temperature is fitted on the
+    *validation* split (never on test) and applied to the logits. It leaves
+    predictions and accuracy untouched and only makes the confidences honest —
+    on the reported run ECE fell 0.054 → 0.048 (T = 1.07). The bulk of the
+    calibration gain (0.150 → 0.054) came from the better model itself, not from
+    this step. `--no-temperature-scaling` reports raw confidences.
+  - **test-time augmentation** (`--tta`, **off by default**): averages the logits
+    over the frame and its horizontal mirror. In principle a free ensemble, but
+    measured on this data it is slightly *worse* (0.687 → 0.682 accuracy, ECE
+    0.048 → 0.072) for 2x the inference cost, so it is disabled — see
+    [`experiments.md`](experiments.md).
   - **balanced accuracy** and macro precision/recall/F1, with a **bootstrap**
     interval on macro-F1;
   - **top-2 / top-3** accuracy;
@@ -174,9 +183,10 @@ Cropping to the animal (using the dataset/MegaDetector boxes) improves
 unseen-location accuracy from 0.46 to 0.69 and cuts the calibration error
 sharply (0.22 → 0.05), so detection is a genuine part of the pipeline, not an afterthought.
 
-## 6. Detection stage (YOLOv8)
+## 6. Detection stage (MegaDetector, with a YOLOv8 fallback)
 
-`src/detect.py` wraps a COCO-pretrained YOLOv8n detector. About half of the CCT
+`src/megadetector.py` wraps MegaDetector v5 (the default) and `src/detect.py`
+wraps a COCO-pretrained YOLOv8n detector (`--detector yolov8`). About half of the CCT
 frames (598 of 1,200) have a ground-truth bounding box; `scripts/fill_boxes_yolo.py` runs the
 detector over the frames that don't and writes the detected box into the manifest
 (`box_source = gt | megadetector | yolov8 | none`), raising box coverage from 50% to **86%**. The

@@ -169,8 +169,20 @@ def _validate_checkpoint(state, cfg, dataset_class_names):
     # Any setting that changes the pixels the model is shown, or which split it is
     # scored on, must match — scoring a crop-trained model on full frames would
     # otherwise silently report the wrong number instead of failing.
-    for field in ("backbone", "image_size", "grayscale_to_rgb",
-                  "crop_to_bbox", "pad_to_square", "split_by"):
+    fields = ["backbone", "image_size", "grayscale_to_rgb",
+              "crop_to_bbox", "pad_to_square", "split_by",
+              # `seed` and `seen_test_fraction` decide WHICH images were trained
+              # on: the seed drives both the stratified split and the
+              # seen-location carve, and seen_test_fraction sets the carve's size.
+              # A mismatch (e.g. `--checkpoint` from a run with different
+              # settings) scores the model on images it was trained on and
+              # silently inflates the result, which is exactly what this
+              # validation exists to prevent.
+              "seed", "seen_test_fraction"]
+    if getattr(cfg, "split_by", "location") == "stratified":
+        # Under the random split these two also determine the split itself.
+        fields += ["val_fraction", "test_fraction"]
+    for field in fields:
         if field in ck and getattr(cfg, field) != ck[field]:
             raise ValueError(
                 f"config mismatch on '{field}': checkpoint={ck[field]!r}, "
@@ -370,8 +382,12 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
     print(f"[test/unseen] n={unseen['n']}  accuracy={unseen['accuracy']:.3f} "
           f"(95% CI {lo:.3f}-{hi:.3f})  balanced={unseen['balanced_accuracy']:.3f}")
     f_lo, f_hi = unseen["f1_macro_boot_95ci"]
+    # top-2 is None (JSON null) when there are fewer than 2 classes; formatting
+    # None with ':.3f' would raise *after* metrics.json was already written.
+    top2 = unseen["top2_accuracy"]
+    top2_str = "n/a" if top2 is None else f"{top2:.3f}"
     print(f"              macro-F1={unseen['f1_macro']:.3f} (95% CI {f_lo:.3f}-{f_hi:.3f})  "
-          f"top-2={unseen['top2_accuracy']:.3f}  ECE={unseen['expected_calibration_error']:.3f}")
+          f"top-2={top2_str}  ECE={unseen['expected_calibration_error']:.3f}")
     if "seen_locations" in metrics:
         s = metrics["seen_locations"]
         print(f"[test/seen]   n={s['n']}  accuracy={s['accuracy']:.3f}  "

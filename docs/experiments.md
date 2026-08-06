@@ -24,7 +24,7 @@ smoothing 0.05; seed 42. "Split" = how train/val/test is partitioned.
 | 2026-07-21 | v3 (pre model-fix) · freeze `layer2` | stratified | 0.611 | 0.608 | Superseded. |
 | 2026-07-21 | v3 + model fixes · freeze `layer2` | location-held-out | 0.554 | 0.552 | Before the seen-location holdout was carved. |
 | — | — | — | — | — | — |
-| 2026-07-21 | **v3 · crop=detected · 16 ep** | **location · unseen** | **0.549** | 0.548 | **Current headline.** 95% CI 0.485–0.612; top-2 0.69; ECE 0.15. |
+| 2026-07-21 | v3 · crop=detected · 16 ep | location · unseen | 0.549 | 0.548 | Previous headline (superseded by the v5 row below). 95% CI 0.485–0.612; top-2 0.69; ECE 0.15. |
 | 2026-07-21 | v3 · crop=detected · 16 ep | location · **seen** | 0.718 | — | Same model, seen-location holdout. Seen−unseen gap **+0.17**. |
 | 2026-07-21 | v3 · crop=**full frame** · 16 ep | location · unseen | 0.459 | 0.455 | Full-frame input. Detected-animal beats it by ~0.09; ECE 0.22. |
 | 2026-07-21 | v3 · crop=detected + **YOLO-filled boxes** (66%) | location · unseen | 0.545 | 0.542 | YOLO raised box coverage 50%→66%; accuracy unchanged within CI. |
