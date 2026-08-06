@@ -23,7 +23,8 @@ import numpy as np
 
 from .data import load_datasets, safe_num_workers
 from .model import build_model
-from .utils import ensure_dir, set_seed, plot_confusion_matrix, load_checkpoint
+from .utils import (ensure_dir, set_seed, plot_confusion_matrix,
+                    plot_roc_curves, load_checkpoint)
 
 
 # --------------------------------------------------------------------------- #
@@ -70,6 +71,26 @@ def expected_calibration_error(confidences, correct, n_bins: int = 10) -> float:
         if m.sum() > 0:
             ece += m.sum() / N * abs(correct[m].mean() - confidences[m].mean())
     return float(ece)
+
+
+def roc_auc(probs, y_true, n_classes: int):
+    """Macro one-vs-rest ROC AUC, or None if it cannot be computed.
+
+    AUC summarises the ranking quality of the predicted probabilities across every
+    decision threshold: 1.0 is perfect, 0.5 is random guessing. Reported one-vs-rest
+    and macro-averaged so each species counts equally, matching how we report
+    precision/recall.
+    """
+    from sklearn.metrics import roc_auc_score
+
+    y_true = np.asarray(y_true)
+    if probs.size == 0 or len(np.unique(y_true)) < 2:
+        return None
+    try:
+        return float(roc_auc_score(y_true, probs, multi_class="ovr",
+                                   average="macro", labels=list(range(n_classes))))
+    except Exception:
+        return None
 
 
 def topk_accuracy(probs, y_true, k: int):
@@ -219,6 +240,7 @@ def _metrics_for(y_true, y_pred, probs, class_names, seed):
             y_true, y_pred,
             lambda a, b: f1_score(a, b, average="macro", zero_division=0), seed=seed),
         "precision_macro": p_macro, "recall_macro": r_macro,
+        "roc_auc_macro_ovr": roc_auc(probs, y_true, len(class_names)),
         "top2_accuracy": topk_accuracy(probs, y_true, 2),
         "top3_accuracy": topk_accuracy(probs, y_true, 3),
         "expected_calibration_error": expected_calibration_error(conf, correct),
@@ -354,6 +376,7 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
 
     cm = confusion_matrix(y_true, y_pred, labels=list(range(n_classes)))
     plot_confusion_matrix(cm, class_names, os.path.join(out, "confusion_matrix.png"))
+    plot_roc_curves(probs, y_true, class_names, os.path.join(out, "roc_curves.png"))
     _save_error_examples(datasets.test, y_true, y_pred, probs, class_names,
                          os.path.join(out, "error_analysis.png"))
 
@@ -386,8 +409,11 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
     # None with ':.3f' would raise *after* metrics.json was already written.
     top2 = unseen["top2_accuracy"]
     top2_str = "n/a" if top2 is None else f"{top2:.3f}"
+    auc_v = unseen.get("roc_auc_macro_ovr")
+    auc_str = "n/a" if auc_v is None else f"{auc_v:.3f}"
     print(f"              macro-F1={unseen['f1_macro']:.3f} (95% CI {f_lo:.3f}-{f_hi:.3f})  "
-          f"top-2={top2_str}  ECE={unseen['expected_calibration_error']:.3f}")
+          f"AUC={auc_str}  top-2={top2_str}  "
+          f"ECE={unseen['expected_calibration_error']:.3f}")
     if "seen_locations" in metrics:
         s = metrics["seen_locations"]
         print(f"[test/seen]   n={s['n']}  accuracy={s['accuracy']:.3f}  "

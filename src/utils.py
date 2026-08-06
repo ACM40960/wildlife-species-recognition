@@ -123,6 +123,42 @@ def plot_training_curves(history: dict, out_path: str) -> None:
     plt.close(fig)
 
 
+def plot_roc_curves(probs, y_true, class_names, out_path):
+    """One-vs-rest ROC curve per class, plus the macro AUC in the title.
+
+    Recall (true-positive rate) against false-positive rate at every threshold;
+    the diagonal is random guessing.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import roc_curve, auc
+
+    probs, y_true = np.asarray(probs), np.asarray(y_true)
+    if probs.size == 0:
+        return None
+    fig, ax = plt.subplots(figsize=(6, 5.5))
+    aucs = []
+    for i, name in enumerate(class_names):
+        binary = (y_true == i).astype(int)
+        if binary.sum() == 0:
+            continue
+        fpr, tpr, _ = roc_curve(binary, probs[:, i])
+        a = auc(fpr, tpr)
+        aucs.append(a)
+        ax.plot(fpr, tpr, lw=1.6, label=f"{name} (AUC {a:.2f})")
+    ax.plot([0, 1], [0, 1], "k--", lw=1, label="random (AUC 0.50)")
+    ax.set_xlabel("False positive rate")
+    ax.set_ylabel("True positive rate (recall)")
+    macro = float(np.mean(aucs)) if aucs else float("nan")
+    ax.set_title(f"ROC curves, one-vs-rest (macro AUC {macro:.3f})")
+    ax.legend(fontsize=8, loc="lower right")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=120)
+    plt.close(fig)
+    return out_path
+
+
 def plot_confusion_matrix(cm: np.ndarray, class_names: Sequence[str], out_path: str) -> None:
     """Save a normalised confusion matrix heatmap to a PNG."""
     import matplotlib
@@ -142,12 +178,15 @@ def plot_confusion_matrix(cm: np.ndarray, class_names: Sequence[str], out_path: 
     ax.set_yticklabels(class_names)
     ax.set_xlabel("predicted")
     ax.set_ylabel("true")
-    ax.set_title("Confusion matrix (row-normalised)")
+    ax.set_title("Confusion matrix\nrow-normalised (raw count)")
 
+    # Row-normalised colours (recall per true class), with the raw count beneath:
+    # normalising makes rows comparable, the counts keep any class imbalance visible.
     for i in range(n):
         for j in range(n):
-            ax.text(j, i, f"{norm[i, j]:.2f}", ha="center", va="center",
-                    color="white" if norm[i, j] < 0.5 else "black", fontsize=8)
+            ax.text(j, i, f"{norm[i, j]:.2f}\n({int(cm[i, j])})",
+                    ha="center", va="center",
+                    color="white" if norm[i, j] < 0.5 else "black", fontsize=7)
 
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     fig.tight_layout()
