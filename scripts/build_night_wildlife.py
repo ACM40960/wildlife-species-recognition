@@ -265,7 +265,8 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
                 "season": _season(int(ts[5:7])) if len(ts) >= 7 else "?",
                 "bbox": ";".join(map(str, box)) if box else "",
                 "has_bbox": box is not None,
-                # gt = ground-truth CCT box; fill_boxes_yolo.py may later set 'yolo'.
+                # gt = ground-truth CCT box; fill_boxes_yolo.py may later replace
+                # a "none" with 'megadetector' or 'yolov8'.
                 "box_source": "gt" if box is not None else "none",
                 "checksum": checksum,
             })

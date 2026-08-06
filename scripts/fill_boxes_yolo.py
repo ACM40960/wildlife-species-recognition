@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""Fill missing animal boxes in the manifest using YOLOv8.
+"""Fill missing animal boxes in the manifest with a detector.
 
 About half of the Caltech Camera Traps frames carry a ground-truth bounding box;
-the rest are classified from the whole frame. This script runs a COCO-pretrained
-YOLOv8 detector over the frames that lack a box and writes the detected box into
-the manifest, so the load-time crop (``crop_to_bbox``) covers more images.
+the rest are classified from the whole frame. This script runs a detector over the
+frames that lack a box and writes the detected box into the manifest, so the
+load-time crop (``crop_to_bbox``) covers more images. MegaDetector is the default
+because it is trained on camera-trap imagery; ``--detector yolov8`` uses the
+COCO-pretrained YOLOv8 instead.
 
 It operates on the already-stored frames (boxes are in stored-image coordinates),
 so no re-download is needed. It adds a ``box_source`` column recording where each
-box came from: ``gt`` (dataset ground truth), ``yolo`` (detected here), or
-``none`` (no box — the frame is used whole). Checksums are unchanged because the
-image files are not modified.
+box came from: ``gt`` (dataset ground truth), ``megadetector`` or ``yolov8``
+(detected here, named after the detector used), or ``none`` (no box — the frame is
+used whole). Checksums are unchanged because the image files are not modified.
 
 Usage:
-    python scripts/fetch_yolo_weights.py        # once, if offline
+    python scripts/fetch_megadetector.py        # once, if offline
     python scripts/fill_boxes_yolo.py --data-dir data/night_wildlife --conf 0.2
 """
 import argparse
