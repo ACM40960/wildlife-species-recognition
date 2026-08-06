@@ -115,7 +115,7 @@ data.
 | Stage | What we did |
 |-------|-------------|
 | Data | 1,200 night infrared photos, 6 species with 200 each, from Caltech Camera Traps |
-| Boxes | 86% of photos have an animal box (half from the dataset itself, the rest found by MegaDetector) |
+| Boxes | 86% of photos have an animal box: 598 came with the dataset, 228 we found with MegaDetector, 200 with YOLOv8 |
 | Split | By camera location, so a whole site goes to train or val or test, never split across them |
 | Preprocessing | Crop to the animal box, pad to a square so nothing is cut off, infrared-specific augmentation |
 | Model | ResNet-18 with ImageNet weights, retraining `layer3`, `layer4` and the classifier head |
