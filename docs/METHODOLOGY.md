@@ -199,8 +199,9 @@ The detector's *class* prediction is ignored — only the box is used, to crop t
 the animal. The COCO-pretrained YOLOv8 reached 66% coverage but added no
 measurable accuracy, because it has never seen a grayscale infrared frame.
 Switching to **MegaDetector** — trained on camera-trap imagery, with classes
-animal/person/vehicle — raised coverage to 86% and contributed roughly +0.05
-accuracy. `--detector yolov8` keeps the old behaviour for comparison.
+animal/person/vehicle — raised coverage to 86% and contributed roughly +0.07
+accuracy (0.614 -> 0.687, see docs/experiments.md). `--detector yolov8` keeps the
+old behaviour for comparison.
 
 ## References
 
