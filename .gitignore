@@ -6,14 +6,11 @@ __pycache__/
 venv/
 env/
 
-# Datasets: never commit the large raw NTLNP data, but DO commit the small
-# ready-to-run real infrared night-vision dataset so the repo works after clone.
+# Datasets: ignore everything under data/ except the small ready-to-run infrared
+# night-vision dataset, which is committed so the repo works straight after clone.
 data/*
 !data/.gitkeep
 !data/night_wildlife/
-data/ntlnp/
-data/ntlnp_raw/
-CIFAR-10-images/
 .cct_cache/
 
 # Training artifacts
