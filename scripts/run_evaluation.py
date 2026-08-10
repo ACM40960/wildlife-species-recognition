@@ -25,6 +25,10 @@ def main():
                     help="dir containing config.json and the checkpoint")
     ap.add_argument("--checkpoint", default=None)
     ap.add_argument("--device", default=None, choices=["auto", "cpu", "cuda"])
+    ap.add_argument("--manifest-name", default=None,
+                    help="evaluate against a different manifest, e.g. the "
+                         "detector-only one from scripts/make_detector_manifest.py. "
+                         "The split column must match the training manifest.")
     ap.add_argument("--tta", dest="tta", action="store_true", default=None,
                     help="average over the horizontal mirror (measured slightly "
                          "worse on this data; off by default)")
@@ -42,6 +46,8 @@ def main():
     cfg.output_dir = args.output_dir
     if args.device is not None:
         cfg.device = args.device
+    if args.manifest_name is not None:
+        cfg.manifest_name = args.manifest_name
     for key in ("tta", "temperature_scaling"):
         val = getattr(args, key, None)
         if val is not None:
