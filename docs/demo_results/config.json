@@ -20,11 +20,12 @@
   "weight_decay": 0.0001,
   "label_smoothing": 0.05,
   "early_stop_patience": 5,
+  "tta": false,
+  "temperature_scaling": true,
   "seed": 42,
   "deterministic": true,
   "device": "cpu",
   "output_dir": "results/v5_final",
   "checkpoint_name": "best_model.pt",
-  "experiment_name": "night_wildlife_resnet18",
-  "tta": false
+  "experiment_name": "night_wildlife_resnet18"
 }

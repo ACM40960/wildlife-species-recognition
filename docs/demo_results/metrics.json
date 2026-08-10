@@ -1,6 +1,7 @@
 {
   "split_by": "location",
   "crop_to_bbox": true,
+  "manifest_name": "manifest.csv",
   "tta": false,
   "temperature": 1.07030189037323,
   "class_names": [
@@ -14,13 +15,13 @@
   "unseen_locations": {
     "n": 233,
     "accuracy": 0.6866952789699571,
-    "accuracy_wilson_95ci": [
+    "accuracy_wilson_95ci_naive": [
       0.6245160101060135,
       0.742818106873436
     ],
     "balanced_accuracy": 0.6799609653381458,
     "f1_macro": 0.6823049381757809,
-    "f1_macro_boot_95ci": [
+    "f1_macro_boot_95ci_naive": [
       0.6234843545419545,
       0.7395952946274499
     ],
@@ -30,7 +31,42 @@
     "top2_accuracy": 0.8283261802575107,
     "top3_accuracy": 0.8927038626609443,
     "expected_calibration_error": 0.04823901251661929,
-    "mean_confidence": 0.6911560893058777
+    "mean_confidence": 0.6911560893058777,
+    "n_locations": 25,
+    "accuracy_cluster_95ci": [
+      0.5970643231114435,
+      0.7804878048780488
+    ],
+    "f1_macro_cluster_95ci": [
+      0.5946445286239989,
+      0.7615228142270608
+    ],
+    "by_box_source": {
+      "gt": {
+        "n": 108,
+        "accuracy": 0.7777777777777778
+      },
+      "megadetector": {
+        "n": 47,
+        "accuracy": 0.6595744680851063
+      },
+      "none": {
+        "n": 38,
+        "accuracy": 0.21052631578947367
+      },
+      "yolov8": {
+        "n": 40,
+        "accuracy": 0.925
+      }
+    },
+    "oracle_gt_box": {
+      "n": 108,
+      "accuracy": 0.7777777777777778
+    },
+    "no_oracle_box": {
+      "n": 125,
+      "accuracy": 0.608
+    }
   },
   "per_class": {
     "bobcat": {
@@ -94,16 +130,17 @@
       ]
     }
   },
+  "test_set_status": "development (used for pipeline selection)",
   "seen_locations": {
     "n": 110,
     "accuracy": 0.8,
-    "accuracy_wilson_95ci": [
+    "accuracy_wilson_95ci_naive": [
       0.7157029644013053,
       0.8640499554452183
     ],
     "balanced_accuracy": 0.7993320720100905,
     "f1_macro": 0.8013238315964285,
-    "f1_macro_boot_95ci": [
+    "f1_macro_boot_95ci_naive": [
       0.7126902185767957,
       0.8693580327498233
     ],
@@ -113,7 +150,42 @@
     "top2_accuracy": 0.9272727272727272,
     "top3_accuracy": 0.9454545454545454,
     "expected_calibration_error": 0.11068665954199702,
-    "mean_confidence": 0.7607975602149963
+    "mean_confidence": 0.7607975602149963,
+    "n_locations": 47,
+    "accuracy_cluster_95ci": [
+      0.7115131578947369,
+      0.8739495798319328
+    ],
+    "f1_macro_cluster_95ci": [
+      0.7035143299755529,
+      0.8754213004024386
+    ],
+    "by_box_source": {
+      "gt": {
+        "n": 60,
+        "accuracy": 0.85
+      },
+      "megadetector": {
+        "n": 19,
+        "accuracy": 0.6842105263157895
+      },
+      "none": {
+        "n": 9,
+        "accuracy": 0.5555555555555556
+      },
+      "yolov8": {
+        "n": 22,
+        "accuracy": 0.8636363636363636
+      }
+    },
+    "oracle_gt_box": {
+      "n": 60,
+      "accuracy": 0.85
+    },
+    "no_oracle_box": {
+      "n": 50,
+      "accuracy": 0.74
+    }
   },
   "seen_minus_unseen_accuracy": 0.11330472103004297
 }
