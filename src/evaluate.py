@@ -42,7 +42,11 @@ def wilson_ci(k: int, n: int, z: float = 1.96):
 
 
 def bootstrap_ci(y_true, y_pred, metric_fn, n_boot: int = 2000, seed: int = 0):
-    """Percentile bootstrap 95% CI for a metric over (y_true, y_pred)."""
+    """Percentile bootstrap 95% CI for a metric over (y_true, y_pred).
+
+    Resamples individual images, so it assumes they are independent. For the
+    unseen-camera claim they are not: see :func:`cluster_bootstrap_ci`.
+    """
     rng = np.random.default_rng(seed)
     yt, yp = np.asarray(y_true), np.asarray(y_pred)
     n = len(yt)
@@ -52,6 +56,44 @@ def bootstrap_ci(y_true, y_pred, metric_fn, n_boot: int = 2000, seed: int = 0):
     for b in range(n_boot):
         idx = rng.integers(0, n, n)
         stats[b] = metric_fn(yt[idx], yp[idx])
+    lo, hi = np.percentile(stats, [2.5, 97.5])
+    return (float(lo), float(hi))
+
+
+def cluster_bootstrap_ci(y_true, y_pred, groups, metric_fn,
+                         n_boot: int = 2000, seed: int = 0):
+    """Percentile bootstrap that resamples whole camera locations, not images.
+
+    Images from one camera share a background, a time of year and often an
+    individual animal, so they are not independent draws. An image-level
+    interval (Wilson, or :func:`bootstrap_ci`) therefore understates the
+    uncertainty of a claim about *new cameras*, because it treats 24 correlated
+    frames from one site as 24 independent observations.
+
+    The unit of generalisation here is the camera location, so that is the unit
+    resampled: locations are drawn with replacement and every image belonging to
+    a drawn location is taken with it. This is the interval to quote against the
+    unseen-camera result; it is wider, and honestly so.
+    """
+    rng = np.random.default_rng(seed)
+    yt, yp = np.asarray(y_true), np.asarray(y_pred)
+    groups = np.asarray(groups)
+    if len(yt) == 0:
+        return (0.0, 0.0)
+    uniq = np.unique(groups)
+    if len(uniq) < 2:
+        return (float("nan"), float("nan"))
+    members = {g: np.where(groups == g)[0] for g in uniq}
+
+    stats = []
+    for _ in range(n_boot):
+        drawn = rng.choice(uniq, size=len(uniq), replace=True)
+        idx = np.concatenate([members[g] for g in drawn])
+        if len(np.unique(yt[idx])) < 1:
+            continue
+        stats.append(metric_fn(yt[idx], yp[idx]))
+    if not stats:
+        return (float("nan"), float("nan"))
     lo, hi = np.percentile(stats, [2.5, 97.5])
     return (float(lo), float(hi))
 
@@ -216,7 +258,18 @@ def _validate_checkpoint(state, cfg, dataset_class_names):
 # --------------------------------------------------------------------------- #
 # Metric bundle for one split
 # --------------------------------------------------------------------------- #
-def _metrics_for(y_true, y_pred, probs, class_names, seed):
+def _metrics_for(y_true, y_pred, probs, class_names, seed,
+                 locations=None, box_sources=None):
+    """Metric bundle for one split.
+
+    Args:
+        locations: per-image camera location. When given, a cluster bootstrap
+            over locations is reported alongside the image-level intervals; that
+            is the interval to quote for an unseen-camera claim.
+        box_sources: per-image ``box_source``. When given, accuracy is broken
+            down by where the bounding box came from, because ground-truth boxes
+            are an oracle that is not available at inference on a new camera.
+    """
     from sklearn.metrics import (accuracy_score, balanced_accuracy_score,
                                  precision_recall_fscore_support, f1_score)
 
@@ -230,15 +283,19 @@ def _metrics_for(y_true, y_pred, probs, class_names, seed):
     correct = (np.asarray(y_true) == np.asarray(y_pred)).astype(float)
     conf = probs.max(1) if probs.size else np.array([])
 
-    return {
+    def macro_f1(a, b):
+        return f1_score(a, b, average="macro", zero_division=0)
+
+    out = {
         "n": n,
         "accuracy": acc,
-        "accuracy_wilson_95ci": wilson_ci(n_correct, n),
+        # Image-level intervals. These treat correlated frames from one camera as
+        # independent, so they are too narrow for the unseen-camera claim and are
+        # kept only for comparability with the earlier runs in experiments.md.
+        "accuracy_wilson_95ci_naive": wilson_ci(n_correct, n),
         "balanced_accuracy": bal_acc,
         "f1_macro": f_macro,
-        "f1_macro_boot_95ci": bootstrap_ci(
-            y_true, y_pred,
-            lambda a, b: f1_score(a, b, average="macro", zero_division=0), seed=seed),
+        "f1_macro_boot_95ci_naive": bootstrap_ci(y_true, y_pred, macro_f1, seed=seed),
         "precision_macro": p_macro, "recall_macro": r_macro,
         "roc_auc_macro_ovr": roc_auc(probs, y_true, len(class_names)),
         "top2_accuracy": topk_accuracy(probs, y_true, 2),
@@ -246,6 +303,33 @@ def _metrics_for(y_true, y_pred, probs, class_names, seed):
         "expected_calibration_error": expected_calibration_error(conf, correct),
         "mean_confidence": float(conf.mean()) if conf.size else None,
     }
+
+    if locations is not None and len(locations) == n:
+        out["n_locations"] = int(len(set(locations)))
+        out["accuracy_cluster_95ci"] = cluster_bootstrap_ci(
+            y_true, y_pred, locations,
+            lambda a, b: float((a == b).mean()), seed=seed)
+        out["f1_macro_cluster_95ci"] = cluster_bootstrap_ci(
+            y_true, y_pred, locations, macro_f1, seed=seed)
+
+    if box_sources is not None and len(box_sources) == n:
+        yt, yp = np.asarray(y_true), np.asarray(y_pred)
+        bs = np.asarray(box_sources)
+        by_source, oracle_mask = {}, (bs == "gt")
+        for src in sorted(set(bs.tolist())):
+            m = bs == src
+            by_source[src] = {"n": int(m.sum()),
+                              "accuracy": float((yt[m] == yp[m]).mean())}
+        out["by_box_source"] = by_source
+        # Ground-truth boxes are an oracle: on a new camera image nobody hands
+        # you the animal's location. Split the score so the oracle-assisted part
+        # is visible and cannot be read as an end-to-end result.
+        for name, m in (("oracle_gt_box", oracle_mask),
+                        ("no_oracle_box", ~oracle_mask)):
+            if m.sum():
+                out[name] = {"n": int(m.sum()),
+                             "accuracy": float((yt[m] == yp[m]).mean())}
+    return out
 
 
 def _per_class(y_true, y_pred, class_names):
@@ -333,6 +417,19 @@ def _save_error_examples(dataset, y_true, y_pred, probs, class_names, out_path,
     return out_path
 
 
+def _field(dataset, name):
+    """Per-image manifest field in loader order, or None if unavailable.
+
+    The evaluation loaders are built with ``shuffle=False``, so row *i* of the
+    dataset is prediction *i*. Only a ManifestDataset carries the manifest, so
+    the ImageFolder fallback returns None and the caller skips those metrics.
+    """
+    rows = getattr(dataset, "rows", None)
+    if not rows:
+        return None
+    return [r.get(name, "") for r in rows]
+
+
 # --------------------------------------------------------------------------- #
 # Entry point
 # --------------------------------------------------------------------------- #
@@ -371,7 +468,9 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
         print(f"[calib] fitted temperature T={temperature:.3f} on the val split")
 
     y_true, y_pred, probs = _collect(net, test_loader, device, tta, temperature)
-    unseen = _metrics_for(y_true, y_pred, probs, class_names, cfg.seed)
+    unseen = _metrics_for(y_true, y_pred, probs, class_names, cfg.seed,
+                          locations=_field(datasets.test, "location"),
+                          box_sources=_field(datasets.test, "box_source"))
     per_class = _per_class(y_true, y_pred, class_names)
 
     cm = confusion_matrix(y_true, y_pred, labels=list(range(n_classes)))
@@ -383,28 +482,43 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
     metrics = {
         "split_by": getattr(cfg, "split_by", "location"),
         "crop_to_bbox": getattr(cfg, "crop_to_bbox", True),
+        "manifest_name": getattr(cfg, "manifest_name", "manifest.csv"),
         "tta": tta,
         "temperature": temperature,
         "class_names": class_names,
         "unseen_locations": unseen,       # the honest held-out result
         "per_class": per_class,
+        # This test set has guided pipeline choices (see docs/experiments.md), so
+        # it is a development estimate, not a untouched generalisation estimate.
+        "test_set_status": "development (used for pipeline selection)",
     }
 
     # Seen-location test (issue 23): same model, backgrounds it has seen.
     if datasets.seen_test is not None and len(datasets.seen_test) > 0:
         seen_loader = DataLoader(datasets.seen_test, shuffle=False, **common)
         st, sp, spr = _collect(net, seen_loader, device, tta, temperature)
-        seen = _metrics_for(st, sp, spr, class_names, cfg.seed)
+        seen = _metrics_for(st, sp, spr, class_names, cfg.seed,
+                            locations=_field(datasets.seen_test, "location"),
+                            box_sources=_field(datasets.seen_test, "box_source"))
         metrics["seen_locations"] = seen
         metrics["seen_minus_unseen_accuracy"] = seen["accuracy"] - unseen["accuracy"]
 
     with open(os.path.join(out, "metrics.json"), "w") as fh:
         json.dump(metrics, fh, indent=2, default=list)
 
-    lo, hi = unseen["accuracy_wilson_95ci"]
+    lo, hi = unseen["accuracy_wilson_95ci_naive"]
     print(f"[test/unseen] n={unseen['n']}  accuracy={unseen['accuracy']:.3f} "
-          f"(95% CI {lo:.3f}-{hi:.3f})  balanced={unseen['balanced_accuracy']:.3f}")
-    f_lo, f_hi = unseen["f1_macro_boot_95ci"]
+          f"(naive per-image 95% CI {lo:.3f}-{hi:.3f})  "
+          f"balanced={unseen['balanced_accuracy']:.3f}")
+    if "accuracy_cluster_95ci" in unseen:
+        c_lo, c_hi = unseen["accuracy_cluster_95ci"]
+        print(f"              clustered over {unseen['n_locations']} camera "
+              f"locations: 95% CI {c_lo:.3f}-{c_hi:.3f}  <- quote this one")
+    if "oracle_gt_box" in unseen and "no_oracle_box" in unseen:
+        o, d = unseen["oracle_gt_box"], unseen["no_oracle_box"]
+        print(f"              by box: ground-truth n={o['n']} acc={o['accuracy']:.3f} | "
+              f"no-oracle n={d['n']} acc={d['accuracy']:.3f}")
+    f_lo, f_hi = unseen["f1_macro_boot_95ci_naive"]
     # top-2 is None (JSON null) when there are fewer than 2 classes; formatting
     # None with ':.3f' would raise *after* metrics.json was already written.
     top2 = unseen["top2_accuracy"]

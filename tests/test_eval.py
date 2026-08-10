@@ -3,8 +3,9 @@ import numpy as np
 import pytest
 
 from src.config import Config
-from src.evaluate import (wilson_ci, bootstrap_ci, expected_calibration_error,
-                          topk_accuracy, _validate_checkpoint)
+from src.evaluate import (wilson_ci, bootstrap_ci, cluster_bootstrap_ci,
+                          expected_calibration_error, topk_accuracy,
+                          _validate_checkpoint)
 
 
 # ----- checkpoint validation (issues 20 & 21) -----
@@ -96,6 +97,41 @@ def test_bootstrap_ci_contains_metric():
     lo, hi = bootstrap_ci(y_true, y_pred,
                           lambda a, b: f1_score(a, b, average="macro"), n_boot=300)
     assert lo <= point <= hi
+
+
+def test_cluster_bootstrap_is_wider_than_image_bootstrap():
+    """Correlated frames within a camera must widen the interval.
+
+    Regression test for a real flaw: accuracy was reported with an image-level
+    interval even though the split is location-grouped precisely because frames
+    from one camera are correlated. Treating 24 frames from one site as 24
+    independent observations makes the interval too narrow.
+
+    Here every location is internally perfectly correlated (a site is either all
+    right or all wrong), which is the worst case, so resampling images barely
+    moves the estimate while resampling locations moves it a lot.
+    """
+    y_true, y_pred, groups = [], [], []
+    for loc in range(20):
+        site_correct = loc % 2 == 0
+        for _ in range(12):
+            y_true.append(0)
+            y_pred.append(0 if site_correct else 1)
+            groups.append(f"loc{loc}")
+
+    acc = lambda a, b: float((a == b).mean())        # noqa: E731
+    naive = bootstrap_ci(y_true, y_pred, acc, n_boot=400)
+    clustered = cluster_bootstrap_ci(y_true, y_pred, groups, acc, n_boot=400)
+    assert (clustered[1] - clustered[0]) > (naive[1] - naive[0]) * 2
+    assert clustered[0] <= 0.5 <= clustered[1]
+
+
+def test_cluster_bootstrap_handles_degenerate_input():
+    acc = lambda a, b: float((a == b).mean())        # noqa: E731
+    assert cluster_bootstrap_ci([], [], [], acc) == (0.0, 0.0)
+    # a single location cannot support a between-location interval
+    lo, hi = cluster_bootstrap_ci([0, 1], [0, 1], ["a", "a"], acc, n_boot=10)
+    assert np.isnan(lo) and np.isnan(hi)
 
 
 def test_topk_accuracy_monotonic():
