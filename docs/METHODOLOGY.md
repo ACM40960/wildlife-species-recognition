@@ -142,9 +142,30 @@ size, grayscale, `crop_to_bbox`, `pad_to_square`, `split_by`, `seed`,
 must match what the checkpoint was trained with; a mismatch raises rather than
 silently reporting nonsense. It then scores the checkpoint and writes:
 
+> **Two things to know before quoting any number below.**
+>
+> 1. **Which interval to report.** Accuracy and macro-F1 carry a **cluster
+>    bootstrap over the 25 test camera locations** (`accuracy_cluster_95ci`,
+>    `f1_macro_cluster_95ci`). That is the one to quote. Frames from one camera
+>    share a background, a season and often the same individual, so they are not
+>    independent; the split is location-grouped for exactly that reason. The
+>    image-level Wilson and bootstrap intervals are still written out but are
+>    suffixed **`_naive`** and kept only for comparison with the older runs in
+>    [`experiments.md`](experiments.md). They are roughly 35% narrower and
+>    understate the uncertainty of any claim about new cameras: 0.625 to 0.743
+>    per image against 0.597 to 0.780 clustered.
+> 2. **The test result is a development estimate.** The unseen-location test set
+>    was consulted while choosing the crop strategy, the detector, the
+>    augmentation and whether to use TTA, so it guided pipeline selection and is
+>    not an untouched held-out estimate. `metrics.json` records this as
+>    `test_set_status`. Treat 0.687 as slightly optimistic. Section
+>    [Limitations in the README](../README.md#limitations) explains why it cannot
+>    be repaired with this dataset.
+
 - **Metrics** (`metrics.json`), all with 95% confidence intervals because the
   test set is small (~30/species):
-  - accuracy with a **Wilson** interval;
+  - accuracy with a **location-clustered bootstrap** interval (and a Wilson
+    interval retained as `accuracy_wilson_95ci_naive`);
   - **temperature scaling** (on by default): one temperature is fitted on the
     *validation* split (never on test) and applied to the logits. It leaves
     predictions and accuracy untouched and only makes the confidences honest —
@@ -156,15 +177,25 @@ silently reporting nonsense. It then scores the checkpoint and writes:
     measured on this data it is slightly *worse* (0.687 → 0.682 accuracy, ECE
     0.048 → 0.072) for 2x the inference cost, so it is disabled — see
     [`experiments.md`](experiments.md).
-  - **balanced accuracy** and macro precision/recall/F1, with a **bootstrap**
-    interval on macro-F1;
+  - **balanced accuracy** and macro precision/recall/F1, with a **location-
+    clustered bootstrap** interval on macro-F1 (the image-level one is kept as
+    `f1_macro_boot_95ci_naive`);
   - **top-2 / top-3** accuracy;
   - **expected calibration error** (are the confidences trustworthy?);
-  - a per-class report with a Wilson interval on each species' recall.
+  - a per-class report with a Wilson interval on each species' recall. These are
+    per-image and therefore optimistic in the same way; read them as indicative.
+  - a breakdown by **`box_source`**, plus `oracle_gt_box` and `no_oracle_box`.
+    Roughly half the test frames carry a ground-truth box that would not exist at
+    inference, and they score 0.778 against 0.608 for the rest. See the
+    detector-only evaluation below.
 - **Seen vs. unseen locations.** A fixed, deterministic fraction of the
   training-location images is held out of training (`seen_test_fraction`) and
   scored separately, so the report shows accuracy on **seen** camera sites next to
-  the honest **unseen** number — the gap is the generalisation cost.
+  the **unseen** number — the gap is the generalisation cost. Both are
+  development estimates, per the note above.
+- **Per-image predictions** (`predictions.csv`): filename, location, box source,
+  true and predicted class, and confidence, so any metric here can be recomputed
+  from source rather than taken on trust.
 - **Confusion matrix** (`confusion_matrix.png`) and an **error-analysis montage**
   (`error_analysis.png`) of the most-confident correct predictions and the
   most-confident mistakes, to inspect whether errors come from darkness,
@@ -182,6 +213,33 @@ cropped or on the full frame just by toggling `--crop-to-bbox` / `--no-crop-to-b
 Cropping to the animal (using the dataset/MegaDetector boxes) improves
 unseen-location accuracy from 0.46 to 0.69 and cuts the calibration error
 sharply (0.22 → 0.05), so detection is a genuine part of the pipeline, not an afterthought.
+
+**Detector-only (end-to-end) evaluation.** The 0.69 above uses whatever box the
+manifest holds, and for about half the test frames that is a *ground-truth* box,
+which is an oracle no deployed system has. To measure the pipeline as it would
+actually run, `scripts/make_detector_manifest.py` rebuilds the manifest with every
+ground-truth box discarded and MegaDetector run over every test frame, and
+evaluation is pointed at it:
+
+```bash
+python scripts/make_detector_manifest.py --splits test
+python scripts/run_evaluation.py --output-dir results/v5_final \
+    --manifest-name manifest_detector.csv \
+    --artifacts-dir results/v5_detector_only --device cpu
+```
+
+`--artifacts-dir` is required in practice: without it this run overwrites the
+baseline `metrics.json` and plots in `results/v5_final`, destroying the very
+numbers it is meant to be compared against. The two committed bundles are
+[`demo_results`](demo_results) (baseline) and
+[`demo_results_detector_only`](demo_results_detector_only), each recording the
+`manifest_sha256` it used.
+
+The end-to-end result is **0.682 accuracy, AUC 0.900** at 74% box coverage,
+against 0.687 / 0.891 at 84% coverage with the oracle boxes. The difference sits
+well inside the interval, so the headline does not depend on the ground-truth
+annotations. What does matter is whether a frame gets a box at all: within the
+detector-only run, frames with a box score 0.808 and frames without score 0.328.
 
 ## 6. Detection stage (MegaDetector, with a YOLOv8 fallback)
 

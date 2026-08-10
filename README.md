@@ -155,8 +155,19 @@ Reproduce it with:
 ```bash
 python scripts/make_detector_manifest.py --splits test
 python scripts/run_evaluation.py --output-dir results/v5_final \
-    --manifest-name manifest_detector.csv --device cpu
+    --manifest-name manifest_detector.csv \
+    --artifacts-dir results/v5_detector_only --device cpu
 ```
+
+`--artifacts-dir` matters. Without it the detector-only run writes its metrics
+and plots over the baseline ones in `results/v5_final`, and you lose the numbers
+you were trying to compare against. Both result bundles are committed so you can
+check ours without re-running anything:
+[docs/demo_results](docs/demo_results) for the baseline and
+[docs/demo_results_detector_only](docs/demo_results_detector_only) for this run.
+Each carries its own `metrics.json`, `config.json`, `environment.json` and a
+`predictions.csv` with one row per test photo, plus the SHA-256 of the manifest
+it used so you can tell the two apart.
 
 ## How it works
 
