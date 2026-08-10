@@ -134,6 +134,38 @@ def test_cluster_bootstrap_handles_degenerate_input():
     assert np.isnan(lo) and np.isnan(hi)
 
 
+def test_evaluate_accepts_a_separate_artifacts_dir():
+    """Results must be writable somewhere other than the checkpoint's directory.
+
+    Regression test: the documented detector-only rerun scored the baseline
+    checkpoint against a different manifest but wrote into the baseline's own
+    directory, overwriting the metrics and plots it was meant to be compared
+    against. Reproducing one claim destroyed the evidence for the other.
+    """
+    import inspect
+    from src.evaluate import evaluate
+
+    params = inspect.signature(evaluate).parameters
+    assert "artifacts_dir" in params
+    assert params["artifacts_dir"].default is None      # defaults to output_dir
+
+
+def test_manifest_digest_tracks_the_file_used(tmp_path):
+    """A result bundle must name the manifest it was produced from."""
+    from src.evaluate import _manifest_digest
+
+    class Cfg:
+        data_dir = str(tmp_path)
+        manifest_name = "manifest.csv"
+
+    assert _manifest_digest(Cfg()) is None              # absent file, not a crash
+    (tmp_path / "manifest.csv").write_text("split,class\ntest,bobcat\n")
+    first = _manifest_digest(Cfg())
+    assert first and len(first) == 64
+    (tmp_path / "manifest.csv").write_text("split,class\ntest,coyote\n")
+    assert _manifest_digest(Cfg()) != first
+
+
 def test_topk_accuracy_monotonic():
     probs = np.array([[0.5, 0.3, 0.2], [0.1, 0.2, 0.7]])
     y = [1, 2]

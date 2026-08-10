@@ -29,6 +29,12 @@ def main():
                     help="evaluate against a different manifest, e.g. the "
                          "detector-only one from scripts/make_detector_manifest.py. "
                          "The split column must match the training manifest.")
+    ap.add_argument("--artifacts-dir", default=None,
+                    help="where to write metrics.json, predictions.csv and the "
+                         "plots. Defaults to --output-dir. Use a separate "
+                         "directory when scoring the same checkpoint against a "
+                         "different manifest, otherwise the second run "
+                         "overwrites the first and the two cannot be compared.")
     ap.add_argument("--tta", dest="tta", action="store_true", default=None,
                     help="average over the horizontal mirror (measured slightly "
                          "worse on this data; off by default)")
@@ -53,7 +59,7 @@ def main():
         if val is not None:
             setattr(cfg, key, val)
 
-    evaluate(cfg, checkpoint=args.checkpoint)
+    evaluate(cfg, checkpoint=args.checkpoint, artifacts_dir=args.artifacts_dir)
 
 
 if __name__ == "__main__":

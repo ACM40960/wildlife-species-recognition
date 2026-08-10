@@ -23,7 +23,7 @@ import numpy as np
 
 from .data import load_datasets, safe_num_workers
 from .model import build_model
-from .utils import (ensure_dir, set_seed, plot_confusion_matrix,
+from .utils import (ensure_dir, environment_info, set_seed, plot_confusion_matrix,
                     plot_roc_curves, load_checkpoint)
 
 
@@ -417,6 +417,40 @@ def _save_error_examples(dataset, y_true, y_pred, probs, class_names, out_path,
     return out_path
 
 
+def _manifest_digest(cfg):
+    """SHA-256 of the manifest actually used, so a result names its own inputs.
+
+    Two runs of the same checkpoint can differ only in which manifest supplied
+    the bounding boxes. Recording the digest means a committed result bundle can
+    be checked against the manifest it claims to describe.
+    """
+    import hashlib
+
+    path = os.path.join(cfg.data_dir, getattr(cfg, "manifest_name", "manifest.csv"))
+    if not os.path.exists(path):
+        return None
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
+
+def _write_predictions(path, dataset, y_true, y_pred, probs, class_names):
+    """Per-image predictions, so a reported metric can be recomputed from source."""
+    import csv
+
+    rows = getattr(dataset, "rows", None)
+    with open(path, "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["filename", "location", "box_source", "true", "predicted",
+                    "correct", "confidence", "p_true"])
+        for i, (t, p) in enumerate(zip(y_true, y_pred)):
+            r = rows[i] if rows and i < len(rows) else {}
+            conf = float(probs[i].max()) if probs.size else ""
+            p_true = float(probs[i][t]) if probs.size else ""
+            w.writerow([r.get("filename", ""), r.get("location", ""),
+                        r.get("box_source", ""), class_names[t], class_names[p],
+                        int(t == p), f"{conf:.4f}", f"{p_true:.4f}"])
+    return path
+
+
 def _field(dataset, name):
     """Per-image manifest field in loader order, or None if unavailable.
 
@@ -433,16 +467,26 @@ def _field(dataset, name):
 # --------------------------------------------------------------------------- #
 # Entry point
 # --------------------------------------------------------------------------- #
-def evaluate(cfg, checkpoint: str | None = None) -> Dict:
+def evaluate(cfg, checkpoint: str | None = None,
+             artifacts_dir: str | None = None) -> Dict:
     """Score the checkpoint on the unseen-location test set (and seen-location set
-    if present). Writes metrics.json, confusion_matrix.png and error_analysis.png.
+    if present). Writes metrics.json, predictions.csv and the plots.
+
+    Args:
+        artifacts_dir: where to write results. Defaults to ``cfg.output_dir``,
+            which is also where the config and checkpoint are read from. Pass a
+            different directory when scoring the same checkpoint under different
+            inputs (for example the detector-only manifest), otherwise the second
+            run overwrites the first run's metrics and plots and the two can no
+            longer be compared.
     """
     from sklearn.metrics import confusion_matrix
 
     set_seed(cfg.seed)
     device = cfg.resolved_device()
-    out = ensure_dir(cfg.output_dir)
-    checkpoint = checkpoint or os.path.join(out, cfg.checkpoint_name)
+    source = cfg.output_dir                              # config + checkpoint
+    out = ensure_dir(artifacts_dir or source)            # where results land
+    checkpoint = checkpoint or os.path.join(source, cfg.checkpoint_name)
 
     datasets = load_datasets(cfg)
     class_names = datasets.class_names
@@ -479,10 +523,18 @@ def evaluate(cfg, checkpoint: str | None = None) -> Dict:
     _save_error_examples(datasets.test, y_true, y_pred, probs, class_names,
                          os.path.join(out, "error_analysis.png"))
 
+    _write_predictions(os.path.join(out, "predictions.csv"), datasets.test,
+                       y_true, y_pred, probs, class_names)
+    cfg.to_json(os.path.join(out, "config.json"))
+    with open(os.path.join(out, "environment.json"), "w") as fh:
+        json.dump(environment_info(), fh, indent=2)
+
     metrics = {
         "split_by": getattr(cfg, "split_by", "location"),
         "crop_to_bbox": getattr(cfg, "crop_to_bbox", True),
         "manifest_name": getattr(cfg, "manifest_name", "manifest.csv"),
+        "manifest_sha256": _manifest_digest(cfg),
+        "checkpoint": os.path.basename(checkpoint),
         "tta": tta,
         "temperature": temperature,
         "class_names": class_names,
