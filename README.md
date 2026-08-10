@@ -11,9 +11,15 @@ trained on normal daytime photos tend to do badly on these. We trained a CNN to
 recognise six species in night-time infrared frames, and tested it on camera sites
 it had never seen during training.
 
-Our best model gets **68.7% accuracy** (95% CI 62.5-74.3) and a macro AUC of
+Our best model gets **68.7% accuracy** (95% CI 59.7-78.0) and a macro AUC of
 **0.891** on those unseen cameras. With six species, random guessing would be
 16.7%.
+
+Two things to read that number with. The interval is resampled over whole camera
+locations, not over images, because photos from one camera are not independent.
+And this test set guided our pipeline choices, so 0.687 is a development result,
+not a clean estimate on data we never looked at. Both are explained under
+[Results](#results).
 
 ![confusion matrix](docs/demo_results/confusion_matrix.png)
 ![ROC curves](docs/demo_results/roc_curves.png)
@@ -58,14 +64,21 @@ give 95% confidence intervals because the test set is fairly small.
 
 | Metric | Value |
 |--------|-------|
-| Accuracy | 0.687 (0.625 - 0.743) |
+| Accuracy | 0.687 (0.597 - 0.780) |
 | Balanced accuracy | 0.680 |
 | Precision (macro) | 0.691 |
 | Recall (macro) | 0.680 |
-| F1 (macro) | 0.682 (0.623 - 0.740) |
+| F1 (macro) | 0.682 (0.595 - 0.762) |
 | AUC (macro, one-vs-rest) | 0.891 |
 | Top-2 accuracy | 0.828 |
 | Expected calibration error | 0.048 |
+
+The intervals are a bootstrap over the 25 test camera locations, resampling whole
+cameras rather than individual photos. Photos from one camera share a background,
+a season and often the same individual animal, so treating 24 frames from one site
+as 24 independent observations makes the interval look tighter than it is. Doing
+it per image gives 0.625 to 0.743, which is about 35% narrower and, we think,
+wrong for a claim about new cameras.
 
 The AUC being much higher than the accuracy tells us something useful. Even when
 the model's first guess is wrong, it usually still ranks the correct species near
@@ -105,6 +118,45 @@ had used an ordinary random split we would have reported a better looking number
 that did not mean as much.
 
 ![training curves](docs/demo_results/training_curves.png)
+
+### Does it still work without the ground-truth boxes?
+
+Half our test photos come with a bounding box drawn by the people who built
+Caltech Camera Traps. That is an oracle. On a real new photo from a real new
+camera nobody hands you the animal's location, so a score that leans on those
+boxes is not a score for the pipeline you would actually run.
+
+Split by where the box came from, the difference is large:
+
+| Test photos | Count | Accuracy |
+|-------------|-------|----------|
+| Had a ground-truth box | 108 | 0.778 |
+| No ground-truth box | 125 | 0.608 |
+
+So we re-ran the whole test set with the ground-truth boxes thrown away and
+MegaDetector run over every photo, which is exactly what would happen live:
+
+| Setup | Accuracy | AUC | Box coverage |
+|-------|----------|-----|--------------|
+| Manifest boxes (half ground truth) | 0.687 | 0.891 | 84% |
+| **Detector only, end to end** | **0.682** | **0.900** | 74% |
+
+The end-to-end number is 0.682, which is inside the confidence interval of the
+0.687 we report. Losing the oracle boxes drops coverage from 84% to 74%, but
+accuracy barely moves and AUC actually goes up slightly. The headline is not
+being propped up by the ground-truth boxes.
+
+What does matter is whether a photo gets a box at all. Photos the detector finds
+an animal in score 0.808; photos it finds nothing in score 0.328. Better
+detection, not a better classifier, is where the next improvement is.
+
+Reproduce it with:
+
+```bash
+python scripts/make_detector_manifest.py --splits test
+python scripts/run_evaluation.py --output-dir results/v5_final \
+    --manifest-name manifest_detector.csv --device cpu
+```
 
 ## How it works
 
@@ -166,6 +218,15 @@ Running `python scripts/validate_dataset.py` checks the dataset before training.
   frame with the background still in it.
 - One model and one seed. We did not cross-validate across several different
   location splits, which would give a better idea of the uncertainty.
+- **The test set is not untouched.** We compared crop strategies, detectors and
+  augmentation by looking at the unseen-location test accuracy each time, which
+  means the test set helped pick the pipeline. Selection should have happened on
+  validation, or on nested cross-validation over locations, with the test set
+  opened once at the end. So 0.687 is a development number and probably a little
+  optimistic. Every choice we made is logged in
+  [docs/experiments.md](docs/experiments.md) so the extent of it is visible.
+  Fixing it properly needs a fresh set of camera locations that none of our
+  experiments have touched, and there are none left in this dataset.
 
 ## Contributors
 

@@ -8,6 +8,16 @@ img/species, infrared night frames); ResNet-18; grayscale→RGB input; image siz
 224; batch size 32; AdamW lr 3e-4, weight decay 1e-4; cosine schedule; label
 smoothing 0.05; seed 42. "Split" = how train/val/test is partitioned.
 
+> **Read this before quoting a number.** The "Test acc" column below is
+> unseen-location accuracy, and we consulted it while choosing the crop strategy,
+> the detector, the augmentation and whether to use TTA. That makes this test set
+> a *development* set: it influenced the pipeline, so the final 0.687 is not an
+> estimate on data we never looked at and is probably slightly optimistic. The
+> correct protocol is to select on validation or on nested location-grouped
+> cross-validation and open the test set once. We cannot repair it after the fact
+> without camera locations none of these runs touched, and the dataset has none
+> left. Logging every run here is what makes the extent of the reuse auditable.
+
 > **Dataset versions.** v1 = whole-frame centre-crop, random split. v2 = bbox crop
 > baked into files. v3 = deterministic + location/time-stratified sampling,
 > single-species, frames stored **uncropped** with the crop applied at load time.
@@ -29,9 +39,11 @@ smoothing 0.05; seed 42. "Split" = how train/val/test is partitioned.
 | 2026-07-21 | v3 · crop=**full frame** · 16 ep | location · unseen | 0.459 | 0.455 | Full-frame input. Detected-animal beats it by ~0.09; ECE 0.22. |
 | 2026-07-21 | v3 · crop=detected + **YOLO-filled boxes** (66%) | location · unseen | 0.545 | 0.542 | YOLO raised box coverage 50%→66%; accuracy unchanged within CI. |
 | 2026-08-05 | v4 · **letterbox + IR augmentation** (66% boxes) | location · unseen | 0.614 | 0.617 | Padding instead of centre-crop stops cutting animals off; gamma/erasing aug. |
-| 2026-08-05 | **v5 · + MegaDetector boxes (86%)** | **location · unseen** | **0.687** | 0.682 | **Current headline.** 95% CI 0.625–0.743; top-2 0.83; ECE 0.048 (T=1.07). |
+| 2026-08-05 | **v5 · + MegaDetector boxes (86%)** | **location · unseen** | **0.687** | 0.682 | **Current headline**, and a development result (see the note above). 95% CI 0.597 to 0.780 clustered over locations (0.625 to 0.743 per image); top-2 0.83; ECE 0.048 (T=1.07). |
 | 2026-08-05 | v5 · same model | location · **seen** | 0.800 | — | Seen−unseen gap narrowed to **+0.11** (was +0.17). |
 | 2026-08-05 | v5 · **with TTA** (mirror averaging) | location · unseen | 0.682 | 0.677 | Negative result: TTA costs 2x inference and is slightly worse (ECE 0.072 vs 0.048). Disabled by default. |
+| 2026-08-10 | v5 · **detector-only boxes** (no ground truth) | location · unseen | 0.682 | 0.678 | End-to-end run: MegaDetector over every test frame, GT boxes discarded. Coverage 84% down to 74%, accuracy within CI of 0.687, AUC 0.900. The headline does not depend on the oracle boxes. |
+| 2026-08-10 | v5 · same model, split by box provenance | location · unseen | 0.778 / 0.608 | n/a | Frames with a GT box score 0.778; frames without score 0.608. Different subsets, so not a like-for-like comparison, but it is why the detector-only run above was needed. |
 
 Key results:
 
@@ -46,6 +58,11 @@ Key results:
 - **Detected animal vs. full frame** (same split): cropping to the bounding box
   lifts unseen accuracy 0.46 → **0.69** and cuts calibration error sharply
   (0.22 → 0.05).
+- **Which interval to quote:** accuracy CIs are now bootstrapped over the 25 test
+  camera *locations*, not over individual images, because frames from one camera
+  are correlated. Clustered gives 0.597 to 0.780; per-image gives 0.625 to 0.743. The
+  per-image one is ~35% narrower and understates the uncertainty of a claim about
+  new cameras. `metrics.json` reports both, with the naive one suffixed `_naive`.
 - Every run writes `history.csv`/`history.json`, `environment.json`, and
   `error_analysis.png`; metrics carry 95% confidence intervals (test set is small).
 
