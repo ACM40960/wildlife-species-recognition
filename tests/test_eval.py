@@ -1,4 +1,4 @@
-"""Tests for checkpoint validation and evaluation statistics."""
+"""tests for checkpoint validation and evaluation statistics."""
 import numpy as np
 import pytest
 
@@ -39,12 +39,7 @@ def test_validate_checkpoint_requires_class_names():
 
 
 def test_validate_checkpoint_rejects_seen_holdout_mismatch():
-    """A different seed/holdout means the 'seen' split contains TRAINING images.
-
-    The seen-location set is re-carved at evaluation time from cfg.seed and
-    cfg.seen_test_fraction. Scoring a checkpoint trained with different values
-    reports accuracy on images the model was trained on, so it must fail loudly.
-    """
+    """a different seed/holdout means the 'seen' split contains TRAINING images."""
     cfg = Config()
     cfg.seed = 7
     with pytest.raises(ValueError):
@@ -65,8 +60,7 @@ def test_validate_checkpoint_checks_split_fractions_only_when_stratified():
         _validate_checkpoint(_state(["a", "b"], split_by="stratified",
                                     test_fraction=0.30), strat, ["a", "b"])
 
-    # Under the location split they come from the manifest and are ignored, so a
-    # difference must not block evaluation.
+    # under the location split these come from the manifest so a difference is fine
     loc = Config()
     _validate_checkpoint(_state(["a", "b"], split_by="location",
                                 test_fraction=0.30), loc, ["a", "b"])
@@ -100,17 +94,7 @@ def test_bootstrap_ci_contains_metric():
 
 
 def test_cluster_bootstrap_is_wider_than_image_bootstrap():
-    """Correlated frames within a camera must widen the interval.
-
-    Regression test for a real flaw: accuracy was reported with an image-level
-    interval even though the split is location-grouped precisely because frames
-    from one camera are correlated. Treating 24 frames from one site as 24
-    independent observations makes the interval too narrow.
-
-    Here every location is internally perfectly correlated (a site is either all
-    right or all wrong), which is the worst case, so resampling images barely
-    moves the estimate while resampling locations moves it a lot.
-    """
+    """correlated frames within a camera must widen the interval."""
     y_true, y_pred, groups = [], [], []
     for loc in range(20):
         site_correct = loc % 2 == 0
@@ -135,30 +119,24 @@ def test_cluster_bootstrap_handles_degenerate_input():
 
 
 def test_evaluate_accepts_a_separate_artifacts_dir():
-    """Results must be writable somewhere other than the checkpoint's directory.
-
-    Regression test: the documented detector-only rerun scored the baseline
-    checkpoint against a different manifest but wrote into the baseline's own
-    directory, overwriting the metrics and plots it was meant to be compared
-    against. Reproducing one claim destroyed the evidence for the other.
-    """
+    """results must be writable somewhere other than the checkpoint's directory."""
     import inspect
     from src.evaluate import evaluate
 
     params = inspect.signature(evaluate).parameters
     assert "artifacts_dir" in params
-    assert params["artifacts_dir"].default is None      # defaults to output_dir
+    assert params["artifacts_dir"].default is None  # defaults to output_dir
 
 
 def test_manifest_digest_tracks_the_file_used(tmp_path):
-    """A result bundle must name the manifest it was produced from."""
+    """a result bundle must name the manifest it was produced from."""
     from src.evaluate import _manifest_digest
 
     class Cfg:
         data_dir = str(tmp_path)
         manifest_name = "manifest.csv"
 
-    assert _manifest_digest(Cfg()) is None              # absent file, not a crash
+    assert _manifest_digest(Cfg()) is None  # absent file, not a crash
     (tmp_path / "manifest.csv").write_text("split,class\ntest,bobcat\n")
     first = _manifest_digest(Cfg())
     assert first and len(first) == 64
@@ -172,18 +150,18 @@ def test_topk_accuracy_monotonic():
     top1 = topk_accuracy(probs, y, 1)
     top2 = topk_accuracy(probs, y, 2)
     assert 0 <= top1 <= top2 <= 1
-    # argmax predictions are [0, 2]; against y=[1, 2] only the 2nd is correct.
+    # argmax predictions are [0, 2]; against y=[1, 2] only the 2nd is correct
     assert topk_accuracy(probs, [1, 2], 1) == 0.5
-    # top-2 for row 0 is {0,1} which now includes true label 1 => both correct.
+    # top-2 for row 0 is {0,1} which now includes true label 1 => both correct
     assert topk_accuracy(probs, [1, 2], 2) == 1.0
 
 
 def test_temperature_scaling_improves_calibration():
-    """A fitted temperature should soften over-confident logits (T > 1)."""
+    """a fitted temperature should soften over-confident logits (T > 1)."""
     torch = pytest.importorskip("torch")
     from src.evaluate import fit_temperature
 
-    # Deliberately over-confident model: large logits, 30% of them wrong.
+    # deliberately over-confident model: large logits, 30% of them wrong
     g = torch.Generator().manual_seed(0)
     labels = torch.randint(0, 3, (300,), generator=g)
     logits = torch.zeros(300, 3)
@@ -197,8 +175,8 @@ def test_temperature_scaling_improves_calibration():
 
     loader = [(logits, labels)]
     t = fit_temperature(Fixed(), loader, device="cpu")
-    assert t > 1.0            # over-confident => temperature above 1 softens it
-    assert 0 < t < 100        # and stays in a sane range
+    assert t > 1.0  # over-confident => temperature above 1 softens it
+    assert 0 < t < 100  # and stays in a sane range
 
 
 def test_tta_averages_over_horizontal_flip():
@@ -214,13 +192,13 @@ def test_tta_averages_over_horizontal_flip():
             return torch.stack([left, right], dim=1) * 10
 
     images = torch.zeros(4, 3, 8, 8)
-    images[:, :, :, :4] = 1.0                      # bright on the left
+    images[:, :, :, :4] = 1.0  # bright on the left
     labels = torch.zeros(4, dtype=torch.long)
     loader = [(images, labels)]
 
     _, _, p_plain = _collect(FlipSensitive(), loader, "cpu", tta=False)
     _, _, p_tta = _collect(FlipSensitive(), loader, "cpu", tta=True)
-    # Without TTA the model is confident; with TTA the mirrored view cancels it out.
+    # without TTA the model is confident; with TTA the mirrored view cancels it out
     assert p_plain[0].max() > 0.9
     assert abs(p_tta[0][0] - p_tta[0][1]) < 1e-5
 

@@ -1,21 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the night-vision dataset before training.
-
-Checks, and fails (non-zero exit) on any problem:
-
-  1. manifest <-> files agree (every manifest row has a file, no orphan files);
-  2. file integrity — each image opens and its SHA-256 matches the manifest;
-  3. class balance — every class present, counts within tolerance;
-  4. visible-animal annotation — how many frames carry a bounding box;
-  5. split overlap — no image assigned to more than one split;
-  6. location overlap — no camera location shared between splits (the whole point
-     of the location-held-out split);
-  7. every class appears in every split;
-  8. manifest self-consistency — has_bbox, bbox and box_source agree.
-
-Usage:
-    python scripts/validate_dataset.py --data-dir data/night_wildlife
-"""
+"""validate the night-vision dataset before training."""
 import argparse
 import csv
 import hashlib
@@ -42,7 +26,7 @@ def validate(data_dir, manifest_name="manifest.csv", tolerance=0.0):
     rows = list(csv.DictReader(open(manifest_path, newline="")))
     print(f"manifest: {len(rows)} rows\n")
 
-    # 1. manifest <-> files
+    # 1
     manifest_files = {r["filename"] for r in rows}
     disk_files = set()
     for root, _dirs, files in os.walk(data_dir):
@@ -60,7 +44,7 @@ def validate(data_dir, manifest_name="manifest.csv", tolerance=0.0):
     if not missing and not orphan:
         _ok(f"manifest matches {len(disk_files)} files on disk")
 
-    # 2. integrity (open + checksum)
+    # 2
     bad = 0
     try:
         from PIL import Image
@@ -84,7 +68,7 @@ def validate(data_dir, manifest_name="manifest.csv", tolerance=0.0):
     else:
         _ok("all files pass checksum and open cleanly")
 
-    # 3. class balance
+    # 3
     per_class = Counter(r["class"] for r in rows)
     counts = list(per_class.values())
     spread = (max(counts) - min(counts)) / max(counts) if counts else 1
@@ -93,14 +77,13 @@ def validate(data_dir, manifest_name="manifest.csv", tolerance=0.0):
     else:
         _ok(f"class balance ok: {dict(per_class)}")
 
-    # 4. visible-animal annotation (informational, not a hard fail)
+    # 4
     with_box = sum(1 for r in rows if str(r.get("has_bbox")).lower() == "true")
     _ok(f"frames with a bounding box: {with_box}/{len(rows)} "
         f"({100*with_box/max(len(rows),1):.0f}%); the rest are classified from the "
         f"whole frame (letterbox-padded)")
 
-    # 5. split overlap (each filename in exactly one split — trivially true per row,
-    #    but check no filename is duplicated across rows)
+    # 5
     fn_counts = Counter(r["filename"] for r in rows)
     dupes = [f for f, c in fn_counts.items() if c > 1]
     if dupes:
@@ -108,7 +91,7 @@ def validate(data_dir, manifest_name="manifest.csv", tolerance=0.0):
     else:
         _ok("no duplicate filenames across splits")
 
-    # 6. location overlap between splits
+    # 6
     loc_splits = defaultdict(set)
     for r in rows:
         loc_splits[r["location"]].add(r["split"])
@@ -119,7 +102,7 @@ def validate(data_dir, manifest_name="manifest.csv", tolerance=0.0):
     else:
         _ok(f"no location shared between splits ({len(loc_splits)} locations)")
 
-    # 7. every class in every split
+    # 7
     cls_split = defaultdict(set)
     for r in rows:
         cls_split[r["class"]].add(r["split"])
@@ -130,8 +113,7 @@ def validate(data_dir, manifest_name="manifest.csv", tolerance=0.0):
     if all({"train", "val", "test"} <= s for s in cls_split.values()):
         _ok("every class present in train/val/test")
 
-    # 8. manifest self-consistency: has_bbox <-> bbox <-> box_source must agree,
-    #    otherwise the loader and the reported coverage can disagree.
+    # 8
     inconsistent = []
     for r in rows:
         flag = str(r.get("has_bbox")).lower() == "true"
@@ -151,7 +133,7 @@ def validate(data_dir, manifest_name="manifest.csv", tolerance=0.0):
     else:
         _ok("has_bbox, bbox and box_source agree on every row")
 
-    # Provenance summary (informational): where the boxes actually came from.
+    # provenance summary (informational): where the boxes actually came from
     if rows and "box_source" in rows[0]:
         _ok(f"box provenance: {dict(Counter(r['box_source'] for r in rows))}")
 

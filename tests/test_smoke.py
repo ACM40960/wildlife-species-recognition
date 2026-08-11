@@ -1,8 +1,4 @@
-"""End-to-end smoke test: build a tiny dataset, train 1 epoch, evaluate.
-
-Runs entirely offline (no ImageNet weights, no dataset download) so CI can verify
-the whole pipeline wires together and produces its outputs.
-"""
+"""end-to-end smoke test: build a tiny dataset, train 1 epoch, evaluate."""
 import os
 
 import pytest
@@ -25,8 +21,8 @@ def test_train_and_eval_smoke(tmp_path):
     cfg.image_size = 64
     cfg.epochs = 1
     cfg.batch_size = 8
-    cfg.pretrained = False          # no weight download
-    cfg.freeze_until = ""           # train the whole tiny net
+    cfg.pretrained = False  # no weight download
+    cfg.freeze_until = ""  # train the whole tiny net
     cfg.device = "cpu"
     cfg.num_workers = 0
     cfg.output_dir = str(tmp_path / "out")

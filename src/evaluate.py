@@ -1,17 +1,4 @@
-"""Evaluation: metrics with confidence intervals, calibration, seen-vs-unseen,
-and visual error analysis.
-
-Highlights
-----------
-* Validates that the checkpoint's class order and configuration match the current
-  dataset before scoring (a silent mismatch would report nonsense).
-* Reports accuracy with a Wilson interval, macro precision/recall/F1 and balanced
-  accuracy with bootstrap intervals, top-k accuracy, and expected calibration
-  error — the test set is small (~30/species), so the intervals matter.
-* Scores the unseen-location test set and, when available, a held-out
-  seen-location set, so the generalisation gap is explicit.
-* Saves representative correct / false-positive / false-negative examples.
-"""
+"""evaluation: metrics with confidence intervals, calibration, seen-vs-unseen, and visual."""
 from __future__ import annotations
 
 import json
@@ -27,11 +14,9 @@ from .utils import (ensure_dir, environment_info, set_seed, plot_confusion_matri
                     plot_roc_curves, load_checkpoint)
 
 
-# --------------------------------------------------------------------------- #
-# Small statistics helpers
-# --------------------------------------------------------------------------- #
+# small statistics helpers
 def wilson_ci(k: int, n: int, z: float = 1.96):
-    """Wilson score interval for a binomial proportion k/n."""
+    """wilson score interval for a binomial proportion k/n."""
     if n == 0:
         return (0.0, 0.0)
     p = k / n
@@ -42,11 +27,7 @@ def wilson_ci(k: int, n: int, z: float = 1.96):
 
 
 def bootstrap_ci(y_true, y_pred, metric_fn, n_boot: int = 2000, seed: int = 0):
-    """Percentile bootstrap 95% CI for a metric over (y_true, y_pred).
-
-    Resamples individual images, so it assumes they are independent. For the
-    unseen-camera claim they are not: see :func:`cluster_bootstrap_ci`.
-    """
+    """percentile bootstrap 95% CI for a metric over (y_true, y_pred)."""
     rng = np.random.default_rng(seed)
     yt, yp = np.asarray(y_true), np.asarray(y_pred)
     n = len(yt)
@@ -62,19 +43,7 @@ def bootstrap_ci(y_true, y_pred, metric_fn, n_boot: int = 2000, seed: int = 0):
 
 def cluster_bootstrap_ci(y_true, y_pred, groups, metric_fn,
                          n_boot: int = 2000, seed: int = 0):
-    """Percentile bootstrap that resamples whole camera locations, not images.
-
-    Images from one camera share a background, a time of year and often an
-    individual animal, so they are not independent draws. An image-level
-    interval (Wilson, or :func:`bootstrap_ci`) therefore understates the
-    uncertainty of a claim about *new cameras*, because it treats 24 correlated
-    frames from one site as 24 independent observations.
-
-    The unit of generalisation here is the camera location, so that is the unit
-    resampled: locations are drawn with replacement and every image belonging to
-    a drawn location is taken with it. This is the interval to quote against the
-    unseen-camera result; it is wider, and honestly so.
-    """
+    """percentile bootstrap that resamples whole camera locations, not images."""
     rng = np.random.default_rng(seed)
     yt, yp = np.asarray(y_true), np.asarray(y_pred)
     groups = np.asarray(groups)
@@ -106,8 +75,7 @@ def expected_calibration_error(confidences, correct, n_bins: int = 10) -> float:
     bins = np.linspace(0, 1, n_bins + 1)
     ece, N = 0.0, len(confidences)
     for i in range(n_bins):
-        # The first bin is closed on the left so a confidence of exactly 0 is
-        # still counted; every other bin is (lo, hi] to avoid double-counting.
+        # the first bin is closed on the left so a confidence of exactly 0 is still counted
         above_lo = confidences >= bins[i] if i == 0 else confidences > bins[i]
         m = above_lo & (confidences <= bins[i + 1])
         if m.sum() > 0:
@@ -116,13 +84,7 @@ def expected_calibration_error(confidences, correct, n_bins: int = 10) -> float:
 
 
 def roc_auc(probs, y_true, n_classes: int):
-    """Macro one-vs-rest ROC AUC, or None if it cannot be computed.
-
-    AUC summarises the ranking quality of the predicted probabilities across every
-    decision threshold: 1.0 is perfect, 0.5 is random guessing. Reported one-vs-rest
-    and macro-averaged so each species counts equally, matching how we report
-    precision/recall.
-    """
+    """macro one-vs-rest ROC AUC, or None if it cannot be computed."""
     from sklearn.metrics import roc_auc_score
 
     y_true = np.asarray(y_true)
@@ -136,11 +98,7 @@ def roc_auc(probs, y_true, n_classes: int):
 
 
 def topk_accuracy(probs, y_true, k: int):
-    """Top-k accuracy, or None when k exceeds the number of classes.
-
-    None (JSON null) rather than NaN: bare NaN is not valid JSON and breaks jq,
-    JavaScript and R parsers reading metrics.json.
-    """
+    """top-k accuracy, or None when k exceeds the number of classes."""
     probs, y_true = np.asarray(probs), np.asarray(y_true)
     if len(y_true) == 0 or k > probs.shape[1]:
         return None
@@ -148,21 +106,9 @@ def topk_accuracy(probs, y_true, k: int):
     return float(np.mean([yt in row for yt, row in zip(y_true, topk)]))
 
 
-# --------------------------------------------------------------------------- #
-# Prediction collection & checkpoint validation
-# --------------------------------------------------------------------------- #
+# prediction collection & checkpoint validation
 def _collect(net, loader, device, tta: bool = False, temperature: float = 1.0):
-    """Run the model over a loader and return (y_true, y_pred, probabilities).
-
-    Args:
-        tta: average the logits over the image and its horizontal mirror. In
-            principle a free ensemble (an animal faces either way), but measured on
-            this dataset it slightly hurts both accuracy and calibration, so it is
-            off by default.
-        temperature: divide logits by this before softmax. Fitted on the
-            validation split, it calibrates confidence without changing the
-            ranking (so accuracy is unchanged, ECE improves).
-    """
+    """run the model over a loader and return (y_true, y_pred, probabilities)."""
     import torch
 
     net.eval()
@@ -181,11 +127,7 @@ def _collect(net, loader, device, tta: bool = False, temperature: float = 1.0):
 
 
 def fit_temperature(net, loader, device, tta: bool = False) -> float:
-    """Fit a single temperature on held-out data by minimising NLL.
-
-    Standard temperature scaling (Guo et al., 2017): a one-parameter fit that
-    leaves predictions untouched and only rescales confidence.
-    """
+    """fit a single temperature on held-out data by minimising NLL."""
     import torch
 
     net.eval()
@@ -203,7 +145,7 @@ def fit_temperature(net, loader, device, tta: bool = False) -> float:
     logits = torch.cat(logits_all)
     labels = torch.cat(labels_all)
 
-    log_t = torch.zeros(1, requires_grad=True)     # optimise log T > 0
+    log_t = torch.zeros(1, requires_grad=True)  # optimise log T > 0
     opt = torch.optim.LBFGS([log_t], lr=0.1, max_iter=60)
     nll = torch.nn.CrossEntropyLoss()
 
@@ -218,7 +160,7 @@ def fit_temperature(net, loader, device, tta: bool = False) -> float:
 
 
 def _validate_checkpoint(state, cfg, dataset_class_names):
-    """Fail loudly if the checkpoint doesn't match the current dataset/config."""
+    """fail loudly if the checkpoint doesn't match the current dataset/config."""
     ckpt_classes = state.get("class_names")
     if ckpt_classes is None:
         raise ValueError("checkpoint has no class_names; cannot validate.")
@@ -229,21 +171,13 @@ def _validate_checkpoint(state, cfg, dataset_class_names):
             f"  dataset:    {list(dataset_class_names)}\n"
             "Re-evaluate against the dataset the checkpoint was trained on.")
     ck = state.get("config", {}) or {}
-    # Any setting that changes the pixels the model is shown, or which split it is
-    # scored on, must match — scoring a crop-trained model on full frames would
-    # otherwise silently report the wrong number instead of failing.
+    # any setting that changes the pixels the model is shown, or which split it is scored on
     fields = ["backbone", "image_size", "grayscale_to_rgb",
               "crop_to_bbox", "pad_to_square", "split_by",
-              # `seed` and `seen_test_fraction` decide WHICH images were trained
-              # on: the seed drives both the stratified split and the
-              # seen-location carve, and seen_test_fraction sets the carve's size.
-              # A mismatch (e.g. `--checkpoint` from a run with different
-              # settings) scores the model on images it was trained on and
-              # silently inflates the result, which is exactly what this
-              # validation exists to prevent.
+              # seed and seen_test_fraction decide which images got trained on
               "seed", "seen_test_fraction"]
     if getattr(cfg, "split_by", "location") == "stratified":
-        # Under the random split these two also determine the split itself.
+        # under the random split these two also determine the split itself
         fields += ["val_fraction", "test_fraction"]
     for field in fields:
         if field in ck and getattr(cfg, field) != ck[field]:
@@ -255,21 +189,10 @@ def _validate_checkpoint(state, cfg, dataset_class_names):
     return len(ckpt_classes)
 
 
-# --------------------------------------------------------------------------- #
-# Metric bundle for one split
-# --------------------------------------------------------------------------- #
+# metric bundle for one split
 def _metrics_for(y_true, y_pred, probs, class_names, seed,
                  locations=None, box_sources=None):
-    """Metric bundle for one split.
-
-    Args:
-        locations: per-image camera location. When given, a cluster bootstrap
-            over locations is reported alongside the image-level intervals; that
-            is the interval to quote for an unseen-camera claim.
-        box_sources: per-image ``box_source``. When given, accuracy is broken
-            down by where the bounding box came from, because ground-truth boxes
-            are an oracle that is not available at inference on a new camera.
-    """
+    """metric bundle for one split."""
     from sklearn.metrics import (accuracy_score, balanced_accuracy_score,
                                  precision_recall_fscore_support, f1_score)
 
@@ -289,9 +212,7 @@ def _metrics_for(y_true, y_pred, probs, class_names, seed,
     out = {
         "n": n,
         "accuracy": acc,
-        # Image-level intervals. These treat correlated frames from one camera as
-        # independent, so they are too narrow for the unseen-camera claim and are
-        # kept only for comparability with the earlier runs in experiments.md.
+        # image-level intervals
         "accuracy_wilson_95ci_naive": wilson_ci(n_correct, n),
         "balanced_accuracy": bal_acc,
         "f1_macro": f_macro,
@@ -321,9 +242,7 @@ def _metrics_for(y_true, y_pred, probs, class_names, seed,
             by_source[src] = {"n": int(m.sum()),
                               "accuracy": float((yt[m] == yp[m]).mean())}
         out["by_box_source"] = by_source
-        # Ground-truth boxes are an oracle: on a new camera image nobody hands
-        # you the animal's location. Split the score so the oracle-assisted part
-        # is visible and cannot be read as an end-to-end result.
+        # ground-truth boxes are an oracle: on a new camera image nobody hands you the animal's
         for name, m in (("oracle_gt_box", oracle_mask),
                         ("no_oracle_box", ~oracle_mask)):
             if m.sum():
@@ -339,7 +258,7 @@ def _per_class(y_true, y_pred, class_names):
         y_true, y_pred, labels=list(range(len(class_names))), zero_division=0)
     out = {}
     for i, name in enumerate(class_names):
-        # Wilson CI on recall = correctly-classified fraction among true class i.
+        # wilson CI on recall = correctly-classified fraction among true class i
         out[name] = {
             "precision": float(p[i]), "recall": float(r[i]), "f1": float(f[i]),
             "support": int(s[i]),
@@ -348,12 +267,10 @@ def _per_class(y_true, y_pred, class_names):
     return out
 
 
-# --------------------------------------------------------------------------- #
-# Visual error analysis (issue 24)
-# --------------------------------------------------------------------------- #
+# visual error analysis (issue 24)
 def _save_error_examples(dataset, y_true, y_pred, probs, class_names, out_path,
                          max_each=6):
-    """Save a montage of correct / false-positive / false-negative examples."""
+    """save a montage of correct / false-positive / false-negative examples."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -379,8 +296,7 @@ def _save_error_examples(dataset, y_true, y_pred, probs, class_names, out_path,
         r = rows[i]
         img = Image.open(os.path.join(dataset.data_dir, r["filename"])).convert("L")
         box = _parse_bbox(r.get("bbox", "")) if dataset.crop_to_bbox else None
-        # Same padded crop the model was actually shown (BBOX_PAD), so the montage
-        # reflects the input, not a tighter box.
+        # same padded crop the model saw, so the montage matches the real input
         return crop_to_box(img, box, dataset.bbox_pad)
 
     cols = max_each
@@ -389,10 +305,7 @@ def _save_error_examples(dataset, y_true, y_pred, probs, class_names, out_path,
     axes = np.atleast_2d(axes)
     for ax in axes.ravel():
         ax.axis("off")
-    # Correct examples always fill the top row and errors the bottom row,
-    # tracking the next free column per row. Deriving the cell from a flat index
-    # instead would spill errors into the "correct" row whenever there are fewer
-    # than ``max_each`` correct predictions (e.g. a small or low-accuracy split).
+    # correct examples always fill the top row and errors the bottom row, tracking the next
     next_col = {"correct": 0, "error": 0}
     row_for = {"correct": 0, "error": 1}
     for kind, i in picks:
@@ -418,12 +331,7 @@ def _save_error_examples(dataset, y_true, y_pred, probs, class_names, out_path,
 
 
 def _manifest_digest(cfg):
-    """SHA-256 of the manifest actually used, so a result names its own inputs.
-
-    Two runs of the same checkpoint can differ only in which manifest supplied
-    the bounding boxes. Recording the digest means a committed result bundle can
-    be checked against the manifest it claims to describe.
-    """
+    """SHA-256 of the manifest actually used, so a result names its own inputs."""
     import hashlib
 
     path = os.path.join(cfg.data_dir, getattr(cfg, "manifest_name", "manifest.csv"))
@@ -433,7 +341,7 @@ def _manifest_digest(cfg):
 
 
 def _write_predictions(path, dataset, y_true, y_pred, probs, class_names):
-    """Per-image predictions, so a reported metric can be recomputed from source."""
+    """per-image predictions, so a reported metric can be recomputed from source."""
     import csv
 
     rows = getattr(dataset, "rows", None)
@@ -452,48 +360,31 @@ def _write_predictions(path, dataset, y_true, y_pred, probs, class_names):
 
 
 def _field(dataset, name):
-    """Per-image manifest field in loader order, or None if unavailable.
-
-    The evaluation loaders are built with ``shuffle=False``, so row *i* of the
-    dataset is prediction *i*. Only a ManifestDataset carries the manifest, so
-    the ImageFolder fallback returns None and the caller skips those metrics.
-    """
+    """per-image manifest field in loader order, or None if unavailable."""
     rows = getattr(dataset, "rows", None)
     if not rows:
         return None
     return [r.get(name, "") for r in rows]
 
 
-# --------------------------------------------------------------------------- #
-# Entry point
-# --------------------------------------------------------------------------- #
+# entry point
 def evaluate(cfg, checkpoint: str | None = None,
              artifacts_dir: str | None = None) -> Dict:
-    """Score the checkpoint on the unseen-location test set (and seen-location set
-    if present). Writes metrics.json, predictions.csv and the plots.
-
-    Args:
-        artifacts_dir: where to write results. Defaults to ``cfg.output_dir``,
-            which is also where the config and checkpoint are read from. Pass a
-            different directory when scoring the same checkpoint under different
-            inputs (for example the detector-only manifest), otherwise the second
-            run overwrites the first run's metrics and plots and the two can no
-            longer be compared.
-    """
+    """score the checkpoint on the unseen-location test set (and seen-location set if."""
     from sklearn.metrics import confusion_matrix
 
     set_seed(cfg.seed)
     device = cfg.resolved_device()
-    source = cfg.output_dir                              # config + checkpoint
-    out = ensure_dir(artifacts_dir or source)            # where results land
+    source = cfg.output_dir  # config + checkpoint
+    out = ensure_dir(artifacts_dir or source)  # where results land
     checkpoint = checkpoint or os.path.join(source, cfg.checkpoint_name)
 
     datasets = load_datasets(cfg)
     class_names = datasets.class_names
     n_classes = len(class_names)
 
-    state = load_checkpoint(checkpoint, map_location=device)   # weights_only=True
-    _validate_checkpoint(state, cfg, class_names)   # issues 20 & 21
+    state = load_checkpoint(checkpoint, map_location=device)  # weights_only=True
+    _validate_checkpoint(state, cfg, class_names)  # issues 20 & 21
 
     net = build_model(cfg.backbone, n_classes, pretrained=False, freeze_until="").to(device)
     net.load_state_dict(state["model_state"])
@@ -504,7 +395,7 @@ def evaluate(cfg, checkpoint: str | None = None,
     test_loader = DataLoader(datasets.test, shuffle=False, **common)
 
     tta = getattr(cfg, "tta", False)
-    # Calibrate on validation (never on test), so the reported ECE is honest.
+    # calibrate on validation (never on test), so the reported ECE is honest
     temperature = 1.0
     if getattr(cfg, "temperature_scaling", True) and len(datasets.val) > 0:
         val_loader = DataLoader(datasets.val, shuffle=False, **common)
@@ -538,14 +429,13 @@ def evaluate(cfg, checkpoint: str | None = None,
         "tta": tta,
         "temperature": temperature,
         "class_names": class_names,
-        "unseen_locations": unseen,       # the honest held-out result
+        "unseen_locations": unseen,  # the honest held-out result
         "per_class": per_class,
-        # This test set has guided pipeline choices (see docs/experiments.md), so
-        # it is a development estimate, not a untouched generalisation estimate.
+        # this test set guided our pipeline choices so it's a development number
         "test_set_status": "development (used for pipeline selection)",
     }
 
-    # Seen-location test (issue 23): same model, backgrounds it has seen.
+    # seen-location test (issue 23): same model, backgrounds it has seen
     if datasets.seen_test is not None and len(datasets.seen_test) > 0:
         seen_loader = DataLoader(datasets.seen_test, shuffle=False, **common)
         st, sp, spr = _collect(net, seen_loader, device, tta, temperature)
@@ -571,8 +461,7 @@ def evaluate(cfg, checkpoint: str | None = None,
         print(f"              by box: ground-truth n={o['n']} acc={o['accuracy']:.3f} | "
               f"no-oracle n={d['n']} acc={d['accuracy']:.3f}")
     f_lo, f_hi = unseen["f1_macro_boot_95ci_naive"]
-    # top-2 is None (JSON null) when there are fewer than 2 classes; formatting
-    # None with ':.3f' would raise *after* metrics.json was already written.
+    # top-2 is None (JSON null) when there are fewer than 2 classes; formatting None with
     top2 = unseen["top2_accuracy"]
     top2_str = "n/a" if top2 is None else f"{top2:.3f}"
     auc_v = unseen.get("roc_auc_macro_ovr")

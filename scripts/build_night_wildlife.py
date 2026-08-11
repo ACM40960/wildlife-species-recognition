@@ -1,39 +1,5 @@
 #!/usr/bin/env python3
-"""Build a real night-vision (infrared) wildlife dataset from Caltech Camera Traps.
-
-Source: the LILA BC Google-Cloud mirror of the Caltech Camera Traps (CCT) dataset
-(Beery et al., ECCV 2018), ~243k camera-trap frames with species labels, bounding
-boxes, timestamps and a camera-location id. At night the traps switch to an
-infrared flash, producing the grayscale, low-contrast frames this project targets.
-
-Design notes (why the pipeline is shaped this way):
-
-  * Deterministic. Records are selected in a fixed, stratified order *before* any
-    download, and filenames / retention follow that order — not whichever
-    concurrent download happens to finish first. Re-running with the same seed
-    produces byte-identical file assignments.
-  * Stratified sampling. Candidates are spread across camera locations *and* time
-    (round-robin over locations; evenly spaced over each location's date range)
-    to reduce selection bias, with a per-location cap.
-  * Non-destructive. The downloaded frame is stored **uncropped** (only downscaled
-    to --store-size for repo size); the animal bounding box is recorded in the
-    manifest and the crop is applied at *load* time (see src/data.py). Nothing is
-    permanently cropped, so the crop strategy can change without re-downloading.
-  * Single-species only. Frames annotated with more than one species are excluded
-    (this is single-label classification); the count is reported.
-  * Transparent failures. Every rejected/failed image is logged with its id and
-    the reason, and a summary is written to build_report.txt.
-  * Clean rebuilds. The output directory is wiped first (guarded to a path under
-    data/) so a smaller re-run cannot leave stale files behind.
-
-The location-grouped train/val/test split and a full manifest.csv (with SHA-256
-checksums) are written so the dataset is verifiable and reproducible; run
-`python scripts/validate_dataset.py` afterwards to check it.
-
-Usage:
-    python scripts/build_night_wildlife.py --out data/night_wildlife \
-        --per-class 200 --per-location-cap 20 --store-size 384
-"""
+"""build a real night-vision (infrared) wildlife dataset from Caltech Camera Traps."""
 import argparse
 import csv
 import hashlib
@@ -57,9 +23,9 @@ BBOX_URL = f"{GCS}/caltechcameratraps/labels/caltech_bboxes_20200316.json"
 IMAGES_BASE = f"{GCS}/caltech-unzipped/cct_images/"
 
 DEFAULT_SPECIES = ["bobcat", "coyote", "raccoon", "opossum", "rabbit", "deer"]
-SAT_THRESHOLD = 6.0                       # mean HSV saturation below => infrared
+SAT_THRESHOLD = 6.0  # mean HSV saturation below => infrared
 NIGHT_HOURS = set(range(19, 24)) | set(range(0, 7))
-NON_ANIMAL_CATS = {30, 33}                # empty, car — not a "second species"
+NON_ANIMAL_CATS = {30, 33}  # empty, car — not a "second species"
 
 
 def _is_night(date_captured: str) -> bool:
@@ -86,7 +52,7 @@ def load_metadata(cache_dir: str):
     cats = {c["id"]: c["name"] for c in data["categories"]}
     images = {i["id"]: i for i in data["images"]}
 
-    # ALL species per image, so we can exclude multi-species frames.
+    # ALL species per image, so we can exclude multi-species frames
     img_species = defaultdict(set)
     for a in data["annotations"]:
         if a["category_id"] not in NON_ANIMAL_CATS:
@@ -104,34 +70,29 @@ def load_metadata(cache_dir: str):
             continue
         cur = boxes.get(a["image_id"])
         if cur is None or bb[2] * bb[3] > cur[2] * cur[3]:
-            boxes[a["image_id"]] = bb            # largest box per image
+            boxes[a["image_id"]] = bb  # largest box per image
     return cats, images, img_species, boxes
 
 
 def _even_spread(items, k):
-    """Pick up to k items evenly spaced across a list (spans the whole range)."""
+    """pick up to k items evenly spaced across a list (spans the whole range)."""
     n = len(items)
     if k <= 0 or n == 0:
         return []
     if n <= k:
         return items
     if k == 1:
-        return [items[n // 2]]        # a single pick: take the middle of the range
+        return [items[n // 2]]  # a single pick: take the middle of the range
     return [items[round(i * (n - 1) / (k - 1))] for i in range(k)]
 
 
 def select_records(species, per_class, per_location_cap, cats, images, img_species):
-    """Deterministic, location- and time-stratified candidate order for one species.
-
-    Excludes multi-species frames and sequence duplicates. Returns a list of image
-    records ordered so that consecutive picks come from different locations and
-    span each location's date range.
-    """
+    """deterministic, location- and time-stratified candidate order for one species."""
     cid = {v: k for k, v in cats.items()}[species]
     by_loc = defaultdict(list)
     seen_seq = set()
     for iid, sset in img_species.items():
-        if sset != {cid}:                        # not exactly this one species
+        if sset != {cid}:  # not exactly this one species
             continue
         rec = images.get(iid)
         if not rec or not _is_night(rec.get("date_captured", "")):
@@ -142,24 +103,21 @@ def select_records(species, per_class, per_location_cap, cats, images, img_speci
         seen_seq.add(seq)
         by_loc[rec.get("location", "?")].append(rec)
 
-    # Within each location: sort by time, then take an even spread across dates.
+    # within each location: sort by time, then take an even spread across dates
     per_loc_ordered = {}
     for loc in sorted(by_loc):
         recs = sorted(by_loc[loc], key=lambda r: r.get("date_captured", ""))
         per_loc_ordered[loc] = _even_spread(recs, per_location_cap)
 
-    # Round-robin across locations (sorted) => location-balanced, deterministic.
+    # round-robin across locations (sorted) => location-balanced, deterministic
     columns = [per_loc_ordered[loc] for loc in sorted(per_loc_ordered)]
     ordered = [r for r in itertools.chain.from_iterable(
         itertools.zip_longest(*columns)) if r is not None]
-    return ordered[: per_class * 3]              # oversample; some rejected later
+    return ordered[: per_class * 3]  # oversample; some rejected later
 
 
 def _process_frame(raw_bytes, store_size, box):
-    """Return (grayscale PIL frame downscaled to store_size, scaled bbox or None).
-
-    The frame is NOT cropped — only downscaled — so the original framing is kept.
-    """
+    """return (grayscale PIL frame downscaled to store_size, scaled bbox or None)."""
     from PIL import Image
     import numpy as np
 
@@ -180,12 +138,12 @@ def _process_frame(raw_bytes, store_size, box):
 
 
 def fetch(rec, box, store_size):
-    """Download and process one record. Returns (rec, image, scaled_box, error)."""
+    """download and process one record."""
     try:
         raw = urllib.request.urlopen(IMAGES_BASE + rec["file_name"], timeout=45).read()
         img, scaled_box = _process_frame(raw, store_size, box)
         return rec, img, scaled_box, None
-    except Exception as e:                        # report, don't hide (issue #10)
+    except Exception as e:  # report, don't hide (issue #10)
         return rec, None, None, f"{type(e).__name__}: {e}"
 
 
@@ -193,8 +151,7 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
           cache_dir, workers, val_fraction, test_fraction, seed):
     cats, images, img_species, boxes = load_metadata(cache_dir)
 
-    # Validate arguments BEFORE touching the output directory — otherwise a typo in
-    # --species wipes the existing dataset and then dies without rebuilding it.
+    # validate arguments BEFORE touching the output directory — otherwise a typo in --species
     known = set(cats.values())
     unknown = [s for s in species_list if s not in known]
     if unknown:
@@ -205,13 +162,10 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
     if per_location_cap < 1:
         raise SystemExit(f"--per-location-cap must be >= 1 (got {per_location_cap})")
 
-    # Clean rebuild (issue #11): wipe the dataset dir, guarded to a data/ path.
+    # clean rebuild (issue #11): wipe the dataset dir, guarded to a data/ path
     norm = os.path.normpath(out_dir)
     if os.path.exists(norm):
-        # An explicit raise, not assert: asserts are stripped under `python -O`,
-        # and this guard stands between a typo and an rmtree. The path must be a
-        # *subdirectory* of a data/ directory - "--out data" would otherwise wipe
-        # every dataset in one keystroke.
+        # an explicit raise, not assert: asserts are stripped under `python -O`, and this guard
         parts = [q for q in norm.split(os.sep) if q not in ("", ".")]
         if "data" not in parts[:-1] or parts[-1] in ("", ".", "..", "data"):
             raise SystemExit(
@@ -221,16 +175,14 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
     os.makedirs(norm, exist_ok=True)
 
     saved_records = []
-    rejects = []                                  # (image_id, class, reason)
+    rejects = []  # (image_id, class, reason)
     for species in species_list:
         cls_dir = os.path.join(out_dir, species)
         os.makedirs(cls_dir, exist_ok=True)
         candidates = select_records(species, per_class, per_location_cap,
                                     cats, images, img_species)
 
-        # Download concurrently, but map every result back to its record so that
-        # retention + filenames follow the deterministic candidate order, not the
-        # order downloads finish in (issue #6).
+        # download concurrently, but map every result back to its record so that retention +
         results = {}
         with ThreadPoolExecutor(max_workers=workers) as ex:
             futs = [ex.submit(fetch, rec, boxes.get(rec["id"]), store_size)
@@ -240,7 +192,7 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
                 results[rec["id"]] = (img, box, err)
 
         saved = 0
-        for rec in candidates:                    # deterministic order
+        for rec in candidates:  # deterministic order
             if saved >= per_class:
                 break
             img, box, err = results.get(rec["id"], (None, None, "no-result"))
@@ -265,8 +217,7 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
                 "season": _season(int(ts[5:7])) if len(ts) >= 7 else "?",
                 "bbox": ";".join(map(str, box)) if box else "",
                 "has_bbox": box is not None,
-                # gt = ground-truth CCT box; fill_boxes_yolo.py may later replace
-                # a "none" with 'megadetector' or 'yolov8'.
+                # gt = ground-truth CCT box; fill_boxes_yolo.py may later replace a "none" with
                 "box_source": "gt" if box is not None else "none",
                 "checksum": checksum,
             })
@@ -277,7 +228,7 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
         print(f"  {species:10s} {saved} images | {n_loc} locations | {n_month} months "
               f"| {n_box} with bbox")
 
-    # Location-grouped split, then write the manifest.
+    # location-grouped split, then write the manifest
     split_by_loc = location_grouped_split(saved_records, val_fraction, test_fraction, seed)
     for r in saved_records:
         r["split"] = split_by_loc[r["location"]]
@@ -292,7 +243,7 @@ def build(out_dir, species_list, per_class, per_location_cap, store_size,
         for r in sorted(saved_records, key=lambda r: r["filename"]):
             w.writerow(r)
 
-    # Build report (issue #10).
+    # build report (issue #10)
     per_split = Counter(r["split"] for r in saved_records)
     reason_counts = Counter(r[2].split(":")[0] for r in rejects)
     report_path = os.path.join(out_dir, "build_report.txt")
@@ -332,7 +283,7 @@ if __name__ == "__main__":
                          "ground-truth one, raising crop coverage")
     args = ap.parse_args()
     if args.fill_boxes:
-        # Fail before the multi-GB download rather than after it.
+        # fail before the multi-GB download rather than after it
         from src import megadetector as _md
         if not _md.available():
             raise SystemExit(
@@ -342,9 +293,7 @@ if __name__ == "__main__":
           args.store_size, args.cache_dir, args.workers,
           args.val_fraction, args.test_fraction, args.seed)
     if args.fill_boxes:
-        # scripts/ is sys.path[0] when this file is run directly, but not under
-        # `python -m scripts.build_night_wildlife`. Add it explicitly so the
-        # import cannot fail *after* the multi-GB download has already run.
+        # scripts/ is sys.path[0] when this file is run directly, but not under `python -m
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from fill_boxes_yolo import fill_manifest_boxes
         fill_manifest_boxes(args.out)

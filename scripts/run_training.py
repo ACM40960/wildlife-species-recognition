@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
-"""Train the transfer-learning model.
-
-Examples:
-    # Train on the infrared night-vision data under data/night_wildlife/<species>/
-    python scripts/run_training.py --data-dir data/night_wildlife --epochs 16 \
-        --pretrained --grayscale --freeze-until layer2
-
-    # Real infrared night-vision demo dataset (Caltech Camera Traps subset)
-    python scripts/run_training.py --data-dir data/night_wildlife --epochs 16 \
-        --image-size 224 --pretrained --grayscale --freeze-until layer2 \
-        --output-dir results/demo
-"""
+"""train the transfer-learning model."""
 import argparse
 import os
 import sys

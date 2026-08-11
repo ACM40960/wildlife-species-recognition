@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
-"""Download MegaDetector v5a weights (checksum-verified).
-
-MegaDetector is the standard camera-trap detector — trained on camera-trap frames
-including infrared night captures, with classes animal/person/vehicle. We use it
-to locate the animal in frames that have no ground-truth bounding box.
-
-The weights are ~280MB and are released by the MegaDetector project on GitHub.
-
-Usage:
-    pip install yolov5 "setuptools<81"
-    python scripts/fetch_megadetector.py
-"""
+"""download MegaDetector v5a weights (checksum-verified)."""
 import argparse
 import hashlib
 import os

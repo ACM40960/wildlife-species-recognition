@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""Classify a single image with a trained checkpoint.
-
-The model is trained and evaluated on the **animal crop**, so this script applies
-the same crop before classifying — otherwise the model sees a full frame it was
-never trained on and accuracy drops sharply. The box is taken from the dataset
-manifest when the image belongs to a built dataset; for an arbitrary image you can
-pass `--detect` to locate the animal (MegaDetector when available), or
-`--no-crop` to force the full frame.
-
-Usage:
-    python scripts/predict.py --checkpoint results/demo/best_model.pt path/to/image.jpg
-    python scripts/predict.py --checkpoint results/demo/best_model.pt --detect photo.jpg
-"""
+"""classify a single image with a trained checkpoint."""
 import argparse
 import os
 import sys
@@ -23,12 +11,7 @@ from src.model import build_model  # noqa: E402
 
 
 def _saved_calibration(checkpoint_path):
-    """Read (tta, temperature) from the metrics.json written next to the checkpoint.
-
-    Both must come from the SAME evaluation run: the temperature is fitted under a
-    particular TTA setting, so pairing a TTA-fitted temperature with single-view
-    logits would mis-calibrate. Falls back to (False, 1.0) when unavailable.
-    """
+    """read (tta, temperature) from the metrics.json written next to the checkpoint."""
     import json
 
     path = os.path.join(os.path.dirname(os.path.abspath(checkpoint_path)),
@@ -44,15 +27,14 @@ def _saved_calibration(checkpoint_path):
 
 
 def resolve_box(image_path, use_detect, no_crop):
-    """Return (box, how) describing which crop to apply."""
+    """return (box, how) describing which crop to apply."""
     if no_crop:
         return None, "full frame (--no-crop)"
     box = lookup_bbox(image_path)
     if box is not None:
         return box, "dataset manifest box"
     if use_detect:
-        # Prefer MegaDetector: it is what the dataset's boxes were built with, and
-        # a COCO detector has poor recall on infrared frames. Fall back to YOLOv8.
+        # prefer MegaDetector: it is what the dataset's boxes were built with, and a COCO
         try:
             from src import megadetector as md
             if md.available():
@@ -61,7 +43,7 @@ def resolve_box(image_path, use_detect, no_crop):
                     return box, "MegaDetector detection"
                 return None, "full frame (MegaDetector found no animal)"
         except SystemExit:
-            pass                       # weights missing; try the COCO detector
+            pass  # weights missing; try the COCO detector
         from src.detect import load_detector, best_animal_box, yolo_available
         if not yolo_available():
             print('[warn] --detect needs a detector: pip install yolov5 "setuptools<81"'
@@ -103,8 +85,7 @@ def main():
     net.load_state_dict(state["model_state"])
     net.eval()
 
-    # Respect how the checkpoint was trained: a model trained on full frames
-    # should be served full frames.
+    # respect how the checkpoint was trained: a model trained on full frames should be served
     no_crop = args.no_crop or not saved.get("crop_to_bbox", True)
     box, how = resolve_box(args.image, args.detect, no_crop)
 
@@ -113,9 +94,7 @@ def main():
     img = crop_to_box(Image.open(args.image).convert("RGB"), box)
     x = tf(img).unsqueeze(0)
 
-    # Match evaluation exactly: same TTA setting, and the temperature that was
-    # fitted on the validation split during evaluation (recorded in metrics.json),
-    # so a printed confidence means the same thing as the reported ECE.
+    # match evaluation exactly: same TTA setting and the temperature fitted on val
     if args.no_calibration:
         tta, temperature = getattr(cfg, "tta", False), 1.0
     else:

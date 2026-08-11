@@ -1,15 +1,4 @@
-"""Location-grouped train/val/test splitting.
-
-Camera-trap frames from the same site share backgrounds, so a naive random split
-lets the model recognise the *location* instead of the *animal*. To measure real
-generalisation we assign whole camera **locations** to a single split, so no
-background is shared between train, validation and test.
-
-The assignment is greedy and class-aware: it fills the test and validation splits
-towards their target fractions **per species**, so every species is represented
-in every split even though the split is by location. It is deterministic given
-the seed.
-"""
+"""location-grouped train/val/test splitting."""
 from __future__ import annotations
 
 import random
@@ -19,16 +8,7 @@ from typing import Dict, List
 
 def location_grouped_split(records: List[dict], val_fraction: float,
                            test_fraction: float, seed: int) -> Dict[str, str]:
-    """Assign each camera location to 'train', 'val' or 'test'.
-
-    Args:
-        records: dicts each with at least ``class`` and ``location`` keys.
-        val_fraction, test_fraction: target share of images (per class).
-        seed: determinism.
-
-    Returns:
-        {location: split} for every location present in ``records``.
-    """
+    """assign each camera location to 'train', 'val' or 'test'."""
     class_total = Counter(r["class"] for r in records)
     test_target = {c: test_fraction * n for c, n in class_total.items()}
     val_target = {c: val_fraction * n for c, n in class_total.items()}
@@ -40,12 +20,10 @@ def location_grouped_split(records: List[dict], val_fraction: float,
     for r in records:
         loc_classes[r["location"]][r["class"]] += 1
 
-    locations = sorted(loc_classes)           # deterministic base order
+    locations = sorted(loc_classes)  # deterministic base order
     random.Random(seed).shuffle(locations)
 
-    # How many locations hold each class, and how many we have already given away
-    # to test/val. A class must keep at least one location for training, otherwise
-    # a species with few sites can end up with no training images at all.
+    # how many locations hold each class, and how many we have already given away to test/val
     class_locations = Counter()
     for classes_here in loc_classes.values():
         for c in classes_here:
@@ -61,14 +39,7 @@ def location_grouped_split(records: List[dict], val_fraction: float,
 
     for loc in locations:
         classes_here = loc_classes[loc]
-        # A location is sent to a split if some class there is still under its
-        # per-class target AND either the split has overall room left OR the
-        # location introduces a class that split doesn't have yet. The
-        # total-room cap stops a single big location from massively overshooting
-        # the target fraction, while the "missing class" clause preserves
-        # per-class coverage. Both are additionally gated on leaving every class
-        # at least one training location — a class with only a couple of sites
-        # would otherwise be handed entirely to test/val and never be trained on.
+        # a location is sent to a split if some class there is still under its per-class target
         can_give_away = keeps_a_training_location(classes_here)
         test_under = any(test_count[c] < test_target[c] for c in classes_here)
         test_room = sum(test_count.values()) < test_total_target

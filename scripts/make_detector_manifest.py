@@ -1,31 +1,5 @@
 #!/usr/bin/env python3
-"""Write a manifest whose boxes come only from a detector, never from ground truth.
-
-Why this exists
----------------
-About half of the Caltech Camera Traps frames ship with a human-drawn bounding
-box, and `manifest.csv` uses it when it is there. That is an **oracle**: on a new
-frame from a new camera nobody hands you the animal's location. A score computed
-partly on ground-truth crops is therefore not an end-to-end result, and mixing
-the two makes it impossible to say which is being measured.
-
-This script produces a parallel manifest in which every row's box comes from the
-detector, so the whole pipeline (detect, crop, classify) can be scored exactly as
-it would run in deployment. Rows where the detector finds nothing get no box and
-are classified from the full frame, which is also what would happen live.
-
-Only the requested splits are re-detected; other rows are copied unchanged. The
-model is already trained by this point, so train/val boxes cannot affect a test
-score, and re-detecting 233 frames instead of 1,200 keeps the run to minutes.
-
-Nothing is overwritten: the output is a new file, and the image files themselves
-are never touched (checksums stay valid).
-
-Usage:
-    python scripts/make_detector_manifest.py --splits test
-    python scripts/run_evaluation.py --output-dir results/v5_final \\
-        --manifest-name manifest_detector.csv --device cpu
-"""
+"""write a manifest whose boxes come only from a detector, never from ground truth."""
 import argparse
 import csv
 import os
@@ -73,7 +47,7 @@ def build(data_dir, manifest_name, out_name, splits, detector, weights, conf):
             r["box_source"] = detector
             counts[detector] += 1
         else:
-            # No detection means no crop, exactly as it would go live.
+            # no detection means no crop, exactly as it would go live
             r["bbox"] = ""
             r["has_bbox"] = False
             r["box_source"] = "none"

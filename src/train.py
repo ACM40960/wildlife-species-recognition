@@ -1,4 +1,4 @@
-"""Training / validation loop with early stopping and checkpointing."""
+"""training / validation loop with early stopping and checkpointing."""
 from __future__ import annotations
 
 import csv
@@ -14,7 +14,7 @@ from .utils import (ensure_dir, set_seed, enable_determinism, environment_info,
 
 
 def _save_history(history: Dict, out: str) -> None:
-    """Persist the full per-epoch history as JSON and CSV, not just a plot."""
+    """persist the full per-epoch history as JSON and CSV, not just a plot."""
     with open(os.path.join(out, "history.json"), "w") as fh:
         json.dump(history, fh, indent=2)
     fields = ["epoch", "train_loss", "train_acc", "val_loss", "val_acc",
@@ -31,7 +31,7 @@ def _run_epoch(net, loader, criterion, optimizer, device, train: bool):
 
     net.train(train)
     if train:
-        # Keep genuinely-frozen BatchNorm layers from updating running stats.
+        # keep genuinely-frozen BatchNorm layers from updating running stats
         freeze_frozen_batchnorm(net)
     total_loss, correct, seen = 0.0, 0, 0
     context = torch.enable_grad() if train else torch.no_grad()
@@ -52,11 +52,7 @@ def _run_epoch(net, loader, criterion, optimizer, device, train: bool):
 
 
 def train(cfg) -> Dict:
-    """Train a model per ``cfg`` and return a results dict.
-
-    Side effects: writes the best checkpoint, config, training-curve plot, and a
-    class-names file into ``cfg.output_dir``.
-    """
+    """train a model per ``cfg`` and return a results dict."""
     import torch
     import torch.nn as nn
 
@@ -90,7 +86,7 @@ def train(cfg) -> Dict:
 
     history = {k: [] for k in ("epoch", "train_loss", "train_acc", "val_loss",
                                "val_acc", "lr", "epoch_time")}
-    # Start below zero so the first epoch always checkpoints, even if val acc is 0.
+    # start below zero so the first epoch always checkpoints, even if val acc is 0
     best_val_acc, best_epoch, epochs_no_improve = -1.0, 0, 0
     ckpt_path = os.path.join(out, cfg.checkpoint_name)
 

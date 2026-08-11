@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch YOLOv8n (COCO) weights into .cct_cache (offline fallback).
-
-On a normal machine ultralytics downloads ``yolov8n.pt`` automatically the first
-time a YOLO model is created. This helper exists for environments where the
-ultralytics asset host is blocked (as in the sandbox this repo was built in): it
-pulls the *identical* weights from a checksum-verified Git-LFS mirror on GitHub.
-
-The download is pinned to a SHA-256 recorded when this mirror was first fetched,
-so the file cannot change underneath you. Note this pins *that* file - it is a
-third-party mirror, not an official Ultralytics release, and the .pt is unpickled
-on load. Prefer letting ultralytics download the official weights when your
-network allows it.
-
-Usage:
-    python scripts/fetch_yolo_weights.py                 # -> .cct_cache/yolov8n.pt
-"""
+"""fetch YOLOv8n (COCO) weights into .cct_cache (offline fallback)."""
 import argparse
 import hashlib
 import os

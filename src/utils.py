@@ -1,4 +1,4 @@
-"""Utility helpers: reproducibility, plotting, and small conveniences."""
+"""utility helpers: reproducibility, plotting, and small conveniences."""
 from __future__ import annotations
 
 import os
@@ -9,7 +9,7 @@ import numpy as np
 
 
 def set_seed(seed: int) -> None:
-    """Seed Python, NumPy, and (if available) PyTorch for reproducible runs."""
+    """seed Python, NumPy, and (if available) PyTorch for reproducible runs."""
     random.seed(seed)
     np.random.seed(seed)
     try:
@@ -21,13 +21,7 @@ def set_seed(seed: int) -> None:
 
 
 def enable_determinism() -> None:
-    """Ask PyTorch for deterministic algorithms where it can provide them.
-
-    ``warn_only=True`` means ops without a deterministic implementation warn
-    rather than crash, so training still runs while being as reproducible as the
-    backend allows. Also disables cuDNN autotuning (a source of run-to-run
-    variation) and sets the cuBLAS workspace required for determinism on CUDA.
-    """
+    """ask PyTorch for deterministic algorithms where it can provide them."""
     os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     try:
         import torch
@@ -39,7 +33,7 @@ def enable_determinism() -> None:
 
 
 def environment_info() -> dict:
-    """Record versions needed to reproduce a run (issue: reproducibility)."""
+    """record versions needed to reproduce a run (issue: reproducibility)."""
     import platform
 
     info = {
@@ -75,27 +69,18 @@ def ensure_dir(path: str) -> str:
 
 
 def load_checkpoint(path: str, map_location="cpu"):
-    """Load a training checkpoint with safe unpickling.
-
-    A PyTorch ``.pt`` file is a pickle, so ``torch.load`` on an untrusted file can
-    execute arbitrary code. We pass ``weights_only=True`` so only tensors and
-    plain data (our ``model_state`` / ``class_names`` / ``config``) are unpickled;
-    a malicious checkpoint cannot run code. Only fall back to the unrestricted
-    loader on older PyTorch that lacks the argument.
-
-    Security note: still only load checkpoints from sources you trust.
-    """
+    """load a training checkpoint with safe unpickling."""
     import torch
 
     try:
         return torch.load(path, map_location=map_location, weights_only=True)
     except TypeError:
-        # PyTorch too old to support weights_only; the pinned range (>=2.2) has it.
+        # PyTorch too old to support weights_only; the pinned range (>=2.2) has it
         return torch.load(path, map_location=map_location)
 
 
 def plot_training_curves(history: dict, out_path: str) -> None:
-    """Save train/val loss and accuracy curves to a PNG."""
+    """save train/val loss and accuracy curves to a PNG."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -124,11 +109,7 @@ def plot_training_curves(history: dict, out_path: str) -> None:
 
 
 def plot_roc_curves(probs, y_true, class_names, out_path):
-    """One-vs-rest ROC curve per class, plus the macro AUC in the title.
-
-    Recall (true-positive rate) against false-positive rate at every threshold;
-    the diagonal is random guessing.
-    """
+    """one-vs-rest ROC curve per class, plus the macro AUC in the title."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -160,7 +141,7 @@ def plot_roc_curves(probs, y_true, class_names, out_path):
 
 
 def plot_confusion_matrix(cm: np.ndarray, class_names: Sequence[str], out_path: str) -> None:
-    """Save a normalised confusion matrix heatmap to a PNG."""
+    """save a normalised confusion matrix heatmap to a PNG."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -180,8 +161,7 @@ def plot_confusion_matrix(cm: np.ndarray, class_names: Sequence[str], out_path: 
     ax.set_ylabel("true")
     ax.set_title("Confusion matrix\nrow-normalised (raw count)")
 
-    # Row-normalised colours (recall per true class), with the raw count beneath:
-    # normalising makes rows comparable, the counts keep any class imbalance visible.
+    # row-normalised colours (recall per true class), with the raw count beneath: normalising
     for i in range(n):
         for j in range(n):
             ax.text(j, i, f"{norm[i, j]:.2f}\n({int(cm[i, j])})",

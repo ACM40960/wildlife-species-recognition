@@ -1,29 +1,11 @@
 #!/usr/bin/env python3
-"""Fetch ImageNet ResNet weights into the torch hub cache (offline fallback).
-
-On a normal machine you do NOT need this: torchvision downloads the weights
-automatically from download.pytorch.org the first time you pass ``--pretrained``.
-This helper exists only for environments where that host is blocked (as in the
-sandbox this repo was built in): it fetches the *identical* weights from a
-checksum-verified Git-LFS mirror and places them where torchvision looks.
-
-Scope: only **resnet18** has a verified mirror configured here. resnet34 and
-resnet50 are offered by the training CLI, but there is no vetted offline mirror
-for them in this repo, so this script fails clearly for those rather than
-pulling an unverified file. On a machine with normal internet access, just use
-``--pretrained`` and torchvision fetches whichever backbone you chose.
-
-Usage:
-    python scripts/fetch_pretrained_weights.py                 # resnet18
-    python scripts/fetch_pretrained_weights.py --backbone resnet34   # errors clearly
-"""
+"""fetch ImageNet ResNet weights into the torch hub cache (offline fallback)."""
 import argparse
 import hashlib
 import os
 import urllib.request
 
-# backbone -> (sha256, mirror_url, [torchvision cache filenames]).
-# mirror_url is None where no verified offline mirror is available.
+# backbone -> (sha256, mirror_url, [torchvision cache filenames])
 REGISTRY = {
     "resnet18": (
         "5c106cde386e87d4033832f2996f5493238eda96ccf559d1d62760c4de0613f8",

@@ -1,15 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a tiny synthetic dataset for CI smoke tests (no network needed).
-
-Creates a handful of solid-ish grayscale images per class across several camera
-"locations", with a manifest identical in shape to the real one (location-grouped
-split, bounding boxes, checksums), so `run_training.py` / `run_evaluation.py` can
-be exercised end-to-end in seconds. This is NOT real data — it only checks the
-pipeline runs and the outputs are produced.
-
-Usage:
-    python scripts/make_tiny_dataset.py --out data/_tiny
-"""
+"""generate a tiny synthetic dataset for CI smoke tests (no network needed)."""
 import argparse
 import csv
 import hashlib

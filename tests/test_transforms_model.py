@@ -1,4 +1,4 @@
-"""Tests for preprocessing transforms and model freezing."""
+"""tests for preprocessing transforms and model freezing."""
 import pytest
 
 from src.data import build_transforms
@@ -18,9 +18,7 @@ def test_transforms_output_shape_and_grayscale():
     tf = build_transforms(image_size=224, grayscale_to_rgb=True, train=False)
     out = tf(_dummy_image())
     assert out.shape == (3, 224, 224)
-    # grayscale->RGB means the 3 channels are identical after Grayscale(3),
-    # before normalisation makes them differ per-channel; check pre-norm path via
-    # a train transform still yields 3 channels.
+    # grayscale->RGB means the 3 channels are identical after Grayscale(3), before
     tf_train = build_transforms(224, True, train=True)
     assert tf_train(_dummy_image()).shape == (3, 224, 224)
 
@@ -31,7 +29,7 @@ def test_transforms_respect_image_size():
 
 
 def test_freeze_default_trains_later_layers():
-    # Default freeze_until="layer2" must train layer3/layer4/fc (not just fc).
+    # default freeze_until="layer2" must train layer3/layer4/fc (not just fc)
     net = build_model("resnet18", num_classes=6, pretrained=False)
     trainable = {n.split(".")[0] for n, p in net.named_parameters() if p.requires_grad}
     assert "layer3" in trainable and "layer4" in trainable and "fc" in trainable
@@ -41,7 +39,7 @@ def test_freeze_default_trains_later_layers():
 def test_freeze_all_is_linear_probe():
     net = build_model("resnet18", num_classes=6, pretrained=False, freeze_until="all")
     trainable = {n.split(".")[0] for n, p in net.named_parameters() if p.requires_grad}
-    assert trainable == {"fc"}      # only the head trains
+    assert trainable == {"fc"}  # only the head trains
 
 
 def test_freeze_empty_trains_everything():
@@ -57,10 +55,10 @@ def test_freeze_until_invalid_raises():
 
 def test_frozen_batchnorm_goes_eval():
     net = build_model("resnet18", num_classes=6, pretrained=False, freeze_until="layer2")
-    net.train()                      # everything to train mode first
+    net.train()  # everything to train mode first
     pinned = freeze_frozen_batchnorm(net)
-    assert pinned > 0                # some frozen BN layers exist
-    # A frozen BN (in layer1) must be in eval; a trainable one (layer4) in train.
+    assert pinned > 0  # some frozen BN layers exist
+    # a frozen BN (in layer1) must be in eval; a trainable one (layer4) in train
     assert net.layer1[0].bn1.training is False
     assert net.layer4[0].bn1.training is True
 

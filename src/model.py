@@ -1,37 +1,17 @@
-"""Transfer-learning model builder.
-
-We start from a CNN pretrained on ImageNet and replace the final classification
-head with one sized to our number of species. By default we freeze the stem and
-the first two residual blocks (``freeze_until="layer2"``) and **retrain layer3,
-layer4 and the head** — the "retrain the later layers" strategy: early
-convolutional filters (edges, textures) transfer well, while the deeper,
-task-specific layers are adapted to camera-trap imagery.
-"""
+"""transfer-learning model builder."""
 from __future__ import annotations
 
 from typing import List
 
 
 _BACKBONES = {"resnet18", "resnet34", "resnet50"}
-# ResNet block order from stem to head.
+# ResNet block order from stem to head
 _BLOCK_ORDER = ["conv1", "bn1", "layer1", "layer2", "layer3", "layer4"]
 
 
 def build_model(backbone: str, num_classes: int, pretrained: bool = True,
                 freeze_until: str = "layer2"):
-    """Create a ResNet with a fresh classification head.
-
-    Args:
-        backbone: one of resnet18 / resnet34 / resnet50.
-        num_classes: number of output species.
-        pretrained: load ImageNet weights.
-        freeze_until: name of the residual block up to and including which
-            parameters are frozen. The default ``"layer2"`` freezes
-            conv1/bn1/layer1/layer2 and trains layer3/layer4/head. ``""`` trains
-            the whole network; ``"all"`` freezes the entire backbone (a linear
-            probe on frozen features); ``"layer4"`` freezes the whole backbone
-            too (only the head trains).
-    """
+    """create a ResNet with a fresh classification head."""
     import torch.nn as nn
     from torchvision import models
 
@@ -43,17 +23,14 @@ def build_model(backbone: str, num_classes: int, pretrained: bool = True,
 
     _apply_freezing(net, freeze_until)
 
-    # Replace the head. ResNet's final layer is ``fc``.
+    # replace the head
     in_features = net.fc.in_features
     net.fc = nn.Linear(in_features, num_classes)  # new head is always trainable
     return net
 
 
 def _apply_freezing(net, freeze_until: str) -> None:
-    """Freeze parameters from the stem up to (and including) ``freeze_until``.
-
-    ResNet block order: conv1, bn1, layer1, layer2, layer3, layer4, fc.
-    """
+    """freeze parameters from the stem up to (and including) ``freeze_until``."""
     if freeze_until == "":
         return  # full fine-tuning
 
@@ -72,13 +49,7 @@ def _apply_freezing(net, freeze_until: str) -> None:
 
 
 def freeze_frozen_batchnorm(net) -> int:
-    """Put fully-frozen BatchNorm modules into eval mode.
-
-    A frozen BatchNorm still updates its running mean/variance under
-    ``net.train()`` even though its affine parameters don't learn, which quietly
-    changes a "frozen" layer. Calling this after ``net.train()`` each epoch keeps
-    such layers genuinely fixed. Returns how many BN modules were pinned.
-    """
+    """put fully-frozen BatchNorm modules into eval mode."""
     import torch.nn as nn
 
     pinned = 0
@@ -96,7 +67,7 @@ def trainable_parameter_names(net) -> List[str]:
 
 
 def count_parameters(net):
-    """Return (trainable, total) parameter counts."""
+    """return (trainable, total) parameter counts."""
     trainable = sum(p.numel() for p in net.parameters() if p.requires_grad)
     total = sum(p.numel() for p in net.parameters())
     return trainable, total

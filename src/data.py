@@ -1,22 +1,4 @@
-"""Dataset loading, splitting, and preprocessing.
-
-Expected on-disk layout (one folder per species, ``ImageFolder`` style)::
-
-    data/night_wildlife/
-        bobcat/    img001.jpg ...
-        coyote/    ...
-        raccoon/   ...
-        deer/      ...
-
-The night-vision camera-trap frames are infrared (single channel). This loader
-treats every image the same way: it is read, optionally forced through a
-grayscale->RGB path (so infrared frames match the 3-channel backbone), resized,
-and normalised with ImageNet statistics so the pretrained backbone sees inputs in
-the distribution it expects.
-
-The split is stratified and deterministic given the seed, so the same image
-never leaks between train / val / test across runs.
-"""
+"""dataset loading, splitting, and preprocessing."""
 from __future__ import annotations
 
 import os
@@ -25,18 +7,13 @@ from typing import List, Tuple
 
 import numpy as np
 
-# ImageNet normalisation constants (the backbone was pretrained with these).
+# ImageNet normalisation constants (the backbone was pretrained with these)
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
 class Letterbox:
-    """Resize preserving aspect ratio and pad to a square — nothing is cut off.
-
-    Centre-cropping a 4:3 camera-trap frame to a square throws away ~35% of its
-    width, which can remove an animal standing near the edge. Padding keeps the
-    whole frame; the grey fill is a neutral value after normalisation.
-    """
+    """resize preserving aspect ratio and pad to a square — nothing is cut off."""
 
     def __init__(self, size: int, fill: int = 114):
         self.size = size
@@ -60,30 +37,17 @@ class Letterbox:
 
 def build_transforms(image_size: int, grayscale_to_rgb: bool, train: bool,
                      pad_to_square: bool = True, ir_augment: bool = True):
-    """Return a torchvision transform pipeline.
-
-    Args:
-        pad_to_square: letterbox-pad instead of centre-cropping, so no part of the
-            frame is discarded (see :class:`Letterbox`).
-        ir_augment: add augmentations suited to grayscale infrared frames — gamma
-            jitter (IR exposure varies a lot), mild blur, and random erasing
-            (simulates occlusion and discourages leaning on the background).
-
-    Training augmentations improve robustness to the pose/brightness variation
-    typical of camera-trap frames. Validation/test are deterministic.
-    """
+    """return a torchvision transform pipeline."""
     from torchvision import transforms
 
     steps = []
-    # Infrared frames are effectively single-channel. Converting to grayscale and
-    # back to 3 channels gives the pretrained (3-channel) backbone a consistent
-    # input regardless of whether a given frame was captured in colour or IR.
+    # infrared frames are effectively single-channel
     if grayscale_to_rgb:
         steps.append(transforms.Grayscale(num_output_channels=3))
 
     if train:
         if pad_to_square:
-            # Letterbox first so scale augmentation samples from the whole frame.
+            # letterbox first so scale augmentation samples from the whole frame
             steps += [Letterbox(image_size),
                       transforms.RandomResizedCrop(image_size, scale=(0.8, 1.0))]
         else:
@@ -95,7 +59,7 @@ def build_transforms(image_size: int, grayscale_to_rgb: bool, train: bool,
         ]
         if ir_augment:
             steps += [
-                # Gamma/sharpness stand in for IR exposure and focus variation.
+                # gamma/sharpness stand in for IR exposure and focus variation
                 transforms.RandomApply(
                     [transforms.ColorJitter(brightness=(0.6, 1.6))], p=0.3),
                 transforms.RandomAdjustSharpness(sharpness_factor=0.4, p=0.2),
@@ -113,7 +77,7 @@ def build_transforms(image_size: int, grayscale_to_rgb: bool, train: bool,
         transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
     ]
     if train and ir_augment:
-        # Random erasing operates on tensors, so it comes after ToTensor.
+        # random erasing operates on tensors, so it comes after ToTensor
         steps.append(transforms.RandomErasing(p=0.25, scale=(0.02, 0.15)))
     return transforms.Compose(steps)
 
@@ -122,15 +86,15 @@ def build_transforms(image_size: int, grayscale_to_rgb: bool, train: bool,
 class Datasets:
     train: object
     val: object
-    test: object                 # unseen-location test (the honest held-out set)
+    test: object  # unseen-location test (the honest held-out set)
     class_names: List[str]
-    seen_test: object = None     # held-out images from SEEN (training) locations
+    seen_test: object = None  # held-out images from SEEN (training) locations
 
 
 def _stratified_indices(targets: List[int], n_classes: int,
                         val_fraction: float, test_fraction: float,
                         seed: int) -> Tuple[List[int], List[int], List[int]]:
-    """Split indices per-class so every class is represented in each split."""
+    """split indices per-class so every class is represented in each split."""
     rng = np.random.default_rng(seed)
     train_idx, val_idx, test_idx = [], [], []
     targets_arr = np.asarray(targets)
@@ -147,7 +111,7 @@ def _stratified_indices(targets: List[int], n_classes: int,
 
 
 def read_manifest(data_dir, manifest_name):
-    """Read manifest rows, or None if there is no manifest."""
+    """read manifest rows, or None if there is no manifest."""
     import csv
 
     path = os.path.join(data_dir, manifest_name)
@@ -168,13 +132,7 @@ def _parse_bbox(raw):
 
 
 def _carve_seen_test(train_rows, fraction, seed):
-    """Deterministically hold out a fraction of train rows as a seen-location test.
-
-    Assignment is by a stable hash of ``image_id`` (not Python's salted ``hash``),
-    so the same images are held out on every run and across processes. Returns
-    (kept_train_rows, seen_test_rows). Stratified per class so each species is
-    represented in the seen-location test.
-    """
+    """deterministically hold out a fraction of train rows as a seen-location test."""
     import hashlib
     from collections import defaultdict
 
@@ -194,16 +152,11 @@ def _carve_seen_test(train_rows, fraction, seed):
     return kept, seen
 
 
-BBOX_PAD = 0.15          # fraction of box size added as padding on each side
+BBOX_PAD = 0.15  # fraction of box size added as padding on each side
 
 
 def lookup_bbox(image_path: str, manifest_name: str = "manifest.csv"):
-    """Find an image's recorded bounding box by searching parent dirs for a manifest.
-
-    Returns ``(x, y, w, h)`` if the image appears in a manifest with a box, else
-    None. Used so single-image prediction applies the same crop the model was
-    trained with.
-    """
+    """find an image's recorded bounding box by searching parent dirs for a manifest."""
     path = os.path.abspath(image_path)
     directory = os.path.dirname(path)
     while True:
@@ -215,19 +168,13 @@ def lookup_bbox(image_path: str, manifest_name: str = "manifest.csv"):
                     return _parse_bbox(row.get("bbox", ""))
             return None
         parent = os.path.dirname(directory)
-        if parent == directory:          # reached the filesystem root
+        if parent == directory:  # reached the filesystem root
             return None
         directory = parent
 
 
 def crop_to_box(img, box, pad: float = BBOX_PAD):
-    """Crop a PIL image to a padded ``(x, y, w, h)`` box.
-
-    Returns the image unchanged when ``box`` is None or the padded box would be
-    degenerate. This is the single implementation of the animal crop — training,
-    evaluation and single-image prediction all call it, so the preprocessing a
-    model is served with cannot drift from what it was trained on.
-    """
+    """crop a PIL image to a padded ``(x, y, w, h)`` box."""
     if box is None:
         return img
     x, y, w, h = box
@@ -241,12 +188,7 @@ def crop_to_box(img, box, pad: float = BBOX_PAD):
 
 
 class ManifestDataset:
-    """Dataset driven by the manifest, cropping to the animal box at *load* time.
-
-    Stored frames are uncropped (see ``scripts/build_night_wildlife.py``); the
-    bounding box lives in the manifest and the crop is applied here, so nothing is
-    baked into the files and the crop strategy is a runtime choice.
-    """
+    """dataset driven by the manifest, cropping to the animal box at *load* time."""
 
     def __init__(self, rows, data_dir, class_to_idx, transform,
                  crop_to_bbox=True, bbox_pad=BBOX_PAD):
@@ -272,17 +214,7 @@ class ManifestDataset:
 
 
 def load_datasets(cfg) -> Datasets:
-    """Produce train/val/test datasets.
-
-    Whenever a manifest is present, images are loaded via :class:`ManifestDataset`
-    so the animal crop (``crop_to_bbox``) is applied identically no matter how the
-    data is split. ``split_by="location"`` uses the location-grouped split recorded
-    in the manifest (whole camera sites held out — no shared backgrounds);
-    ``split_by="stratified"`` re-splits the same manifest rows randomly per class,
-    so the two differ only in the split, not in preprocessing. Without a manifest
-    it falls back to a plain ImageFolder stratified split. Val/test use evaluation
-    transforms; train uses augmentation.
-    """
+    """produce train/val/test datasets."""
     rows = read_manifest(cfg.data_dir, getattr(cfg, "manifest_name", "manifest.csv"))
     split_by = getattr(cfg, "split_by", "location")
 
@@ -300,8 +232,7 @@ def load_datasets(cfg) -> Datasets:
         class_to_idx = {c: i for i, c in enumerate(class_names)}
         by_split = {"train": [], "val": [], "test": []}
         if split_by == "stratified":
-            # Random per-class split over the same rows, so the location-vs-random
-            # comparison isolates the split (preprocessing stays identical).
+            # random per-class split over the same rows, so the location-vs-random comparison
             labels = [class_to_idx[r["class"]] for r in rows]
             tr, va, te = _stratified_indices(labels, len(class_names),
                                              cfg.val_fraction, cfg.test_fraction,
@@ -313,11 +244,7 @@ def load_datasets(cfg) -> Datasets:
                 if r.get("split") in by_split:
                     by_split[r["split"]].append(r)
 
-        # Carve a SEEN-location test set: hold out a fraction of the train-location
-        # images (deterministically, so they are never trained on) to measure
-        # accuracy on locations the model HAS seen, alongside the unseen test set.
-        # Only meaningful for a location split: under a stratified split every
-        # location is already "seen", so carving one would just shrink training.
+        # carve a SEEN-location test set: hold out a fraction of the train-location images
         seen_frac = getattr(cfg, "seen_test_fraction", 0.0)
         seen_rows = []
         if seen_frac > 0 and split_by == "location":
@@ -342,7 +269,7 @@ def load_datasets(cfg) -> Datasets:
             seen_test=ds(seen_rows, eval_tf) if seen_rows else None,
         )
 
-    # Fallback: stratified random split over a plain ImageFolder.
+    # fallback: stratified random split over a plain ImageFolder
     print("[data] stratified random split")
     from torch.utils.data import Subset
     from torchvision.datasets import ImageFolder
@@ -362,22 +289,14 @@ def load_datasets(cfg) -> Datasets:
 
 
 def safe_num_workers(requested: int, min_shm_mb: int = 256) -> int:
-    """Drop to 0 workers when /dev/shm is too small to be safe.
-
-    DataLoader worker processes hand batches to the parent through shared memory.
-    Containers (Docker default, GitHub Codespaces) often mount /dev/shm at only
-    ~64MB, and the run dies mid-epoch with
-    ``RuntimeError: unable to allocate shared memory ... No space left on device``.
-    Loading in-process (0 workers) avoids shared memory entirely; on this dataset
-    it costs little because the images are small.
-    """
+    """drop to 0 workers when /dev/shm is too small to be safe."""
     if requested <= 0:
         return 0
     try:
         st = os.statvfs("/dev/shm")
         shm_mb = st.f_blocks * st.f_frsize / (1024 * 1024)
     except (OSError, AttributeError):
-        return requested                      # not Linux / can't tell: respect it
+        return requested  # not Linux / can't tell: respect it
     if shm_mb < min_shm_mb:
         print(f"[data] /dev/shm is only {shm_mb:.0f}MB; using num_workers=0 "
               f"(requested {requested}) to avoid shared-memory errors.")
@@ -386,7 +305,7 @@ def safe_num_workers(requested: int, min_shm_mb: int = 256) -> int:
 
 
 def make_loaders(cfg, datasets: Datasets):
-    """Wrap the subsets in DataLoaders."""
+    """wrap the subsets in DataLoaders."""
     from torch.utils.data import DataLoader
 
     workers = safe_num_workers(cfg.num_workers)
@@ -400,10 +319,10 @@ def make_loaders(cfg, datasets: Datasets):
 
 
 def _train_labels(train_ds):
-    """Training-split labels without decoding any images where possible."""
+    """training-split labels without decoding any images where possible."""
     if isinstance(train_ds, ManifestDataset):
         return [train_ds.class_to_idx[r["class"]] for r in train_ds.rows]
-    # torch Subset over an ImageFolder: read labels from .samples via indices.
+    # torch Subset over an ImageFolder: read labels from .samples via indices
     dataset = getattr(train_ds, "dataset", None)
     indices = getattr(train_ds, "indices", None)
     if dataset is not None and indices is not None and hasattr(dataset, "samples"):
@@ -412,7 +331,7 @@ def _train_labels(train_ds):
 
 
 def class_weights(datasets: Datasets, n_classes: int):
-    """Inverse-frequency class weights from the training split (for imbalance)."""
+    """inverse-frequency class weights from the training split (for imbalance)."""
     import torch
 
     counts = np.zeros(n_classes, dtype=np.float64)

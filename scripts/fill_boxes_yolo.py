@@ -1,23 +1,5 @@
 #!/usr/bin/env python3
-"""Fill missing animal boxes in the manifest with a detector.
-
-About half of the Caltech Camera Traps frames carry a ground-truth bounding box;
-the rest are classified from the whole frame. This script runs a detector over the
-frames that lack a box and writes the detected box into the manifest, so the
-load-time crop (``crop_to_bbox``) covers more images. MegaDetector is the default
-because it is trained on camera-trap imagery; ``--detector yolov8`` uses the
-COCO-pretrained YOLOv8 instead.
-
-It operates on the already-stored frames (boxes are in stored-image coordinates),
-so no re-download is needed. It adds a ``box_source`` column recording where each
-box came from: ``gt`` (dataset ground truth), ``megadetector`` or ``yolov8``
-(detected here, named after the detector used), or ``none`` (no box — the frame is
-used whole). Checksums are unchanged because the image files are not modified.
-
-Usage:
-    python scripts/fetch_megadetector.py        # once, if offline
-    python scripts/fill_boxes_yolo.py --data-dir data/night_wildlife --conf 0.2
-"""
+"""fill missing animal boxes in the manifest with a detector."""
 import argparse
 import csv
 import os
@@ -31,11 +13,7 @@ from src.detect import load_detector, best_animal_box, yolo_available  # noqa: E
 def fill_manifest_boxes(data_dir, manifest_name="manifest.csv",
                         weights=None, conf=0.2, detector="megadetector",
                         refresh=False):
-    """Fill missing boxes using MegaDetector (default) or COCO YOLOv8.
-
-    MegaDetector is trained on camera-trap imagery (including infrared) and finds
-    animals in far more of these frames than a COCO-pretrained detector.
-    """
+    """fill missing boxes using MegaDetector (default) or COCO YOLOv8."""
     if detector == "megadetector":
         from src import megadetector as md
         if not md.available():
@@ -64,14 +42,10 @@ def fill_manifest_boxes(data_dir, manifest_name="manifest.csv",
     for r in rows:
         existing = (r.get("box_source") or "").strip()
         has_box = str(r.get("has_bbox")).lower() == "true" and r.get("bbox")
-        # Never relabel a box we already have. Re-running used to mark every
-        # boxed row as "gt", which destroyed the record of which detector (or the
-        # dataset itself) supplied it. Only rows with no box are detected now.
-        # Ground truth is never re-detected, even with --refresh.
+        # never relabel a box we already have
         if has_box and (existing == "gt" or not refresh):
             if not existing or existing == "none":
-                # Legacy manifest with no provenance column: a pre-existing box
-                # can only have come from the dataset's ground truth.
+                # legacy manifest with no provenance column: a pre-existing box can only have
                 existing = "gt"
             r["box_source"] = existing
             counts[existing] += 1
@@ -83,9 +57,7 @@ def fill_manifest_boxes(data_dir, manifest_name="manifest.csv",
             r["box_source"] = detector
             counts[detector] += 1
         else:
-            # Clear the box too. Leaving a stale bbox with box_source="none" would
-            # make the loader (which reads bbox) crop to a box the manifest says
-            # does not exist, and inflate the reported coverage.
+            # clear the box too
             r["bbox"] = ""
             r["has_bbox"] = False
             r["box_source"] = "none"

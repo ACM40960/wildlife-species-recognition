@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate a trained checkpoint on the held-out test split.
-
-Reads the config saved next to the checkpoint (results/config.json) so the same
-data split and preprocessing are reproduced, then reports accuracy / precision /
-recall and writes plots.
-
-Examples:
-    python scripts/run_evaluation.py --output-dir results/demo
-    python scripts/run_evaluation.py --output-dir results --checkpoint results/best_model.pt
-"""
+"""evaluate a trained checkpoint on the held-out test split."""
 import argparse
 import os
 import sys
