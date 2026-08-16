@@ -191,7 +191,7 @@ accuracy at all.
 ```
 src/        config, data loading, location split, model, training, evaluation, detection
 scripts/    build the dataset, validate it, train, evaluate, predict
-docs/       methodology, literature review, experiment log, saved results
+docs/       methodology, literature review, experiment log, saved results & documentation
 data/       the infrared dataset and manifest.csv
 tests/      39 tests, run them with pytest
 ```
@@ -200,6 +200,7 @@ tests/      39 tests, run them with pytest
 - [docs/literature_review.md](docs/literature_review.md) for background reading
 - [docs/experiments.md](docs/experiments.md) for every run we did
 - [docs/DATA_LICENSE.md](docs/DATA_LICENSE.md) for data licensing and attribution
+- [docs/Wildlife_Species_Recognition_Documentation.pdf](docs/Wildlife_Species_Recognition_Documentation.pdf) for documentation
 
 Every run is seeded and saves its `config.json`, `environment.json` and a
 per-epoch `history.csv` next to the checkpoint, so results can be reproduced.
