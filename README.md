@@ -52,10 +52,6 @@ Predictions for data/night_wildlife/bobcat/bobcat_0032.jpg  [input: dataset mani
 Training takes about 15 minutes on a laptop CPU. The dataset is included in the
 repo, so nothing else needs downloading.
 
-If you are running inside Codespaces or Docker, data loading stays in one process
-by default, because containers usually give you a very small `/dev/shm`. If yours
-is large you can speed things up with `--num-workers 2`.
-
 ## Results
 
 We tested on 233 images taken at camera locations that were left out of training.
@@ -159,16 +155,6 @@ python scripts/run_evaluation.py --output-dir results/v5_final \
     --artifacts-dir results/v5_detector_only --device cpu
 ```
 
-`--artifacts-dir` matters. Without it the detector-only run writes its metrics
-and plots over the baseline ones in `results/v5_final`, and you lose the numbers
-you were trying to compare against. Both result bundles are committed so you can
-check ours without re-running anything:
-[docs/demo_results](docs/demo_results) for the baseline and
-[docs/demo_results_detector_only](docs/demo_results_detector_only) for this run.
-Each carries its own `metrics.json`, `config.json`, `environment.json` and a
-`predictions.csv` with one row per test photo, plus the SHA-256 of the manifest
-it used so you can tell the two apart.
-
 ## How it works
 
 The short version: take the infrared frame, crop to the animal, and feed it to a
@@ -196,9 +182,8 @@ We changed one thing at a time and kept a log of what each change was worth:
 | Padding instead of cropping, plus infrared augmentation | 0.61 |
 | Better animal boxes from MegaDetector | 0.69 |
 
-Two things we tried did not help, and we left them in the log rather than quietly
-dropping them. Test-time augmentation came out slightly worse, and temperature
-scaling improved how well-calibrated the probabilities are without changing the
+Two things we tried that did not help are test-time augmentation which came out slightly worse, 
+and temperature scaling improved how well-calibrated the probabilities are without changing the
 accuracy at all.
 
 ## What is in the repo
@@ -244,7 +229,7 @@ Running `python scripts/validate_dataset.py` checks the dataset before training.
 | Name | Student number | Main responsibility |
 |------|----------------|---------------------|
 | Srivani Konda ([@srivanik8](https://github.com/srivanik8)) | 25211398 | Data pipeline: dataset builder, preprocessing, splits |
-| Navya Sri Mungamuri | 25200230 | Model, training, evaluation, results |
+| Navya Sri Mungamuri ([@Navyasri Mungamuri](https://github.com/navyasrimungamuri-pixel)) | 25200230 | Model, training, evaluation, results |
 
 ## Licence and credit
 
